@@ -1,0 +1,7 @@
+venv/
+__pycache__/
+*.pyc
+*.db
+database/
+face_data/
+.env

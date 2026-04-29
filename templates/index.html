@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>FaceAttend – Mark Attendance</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0a0a0f; --surface: #111118; --surface2: #1a1a24; --border: #2a2a3a;
+    --accent: #00e5a0; --accent2: #7c3aed; --warn: #f59e0b; --danger: #ef4444;
+    --text: #e8e8f0; --muted: #6b6b80; --font: 'Syne', sans-serif; --mono: 'DM Mono', monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; overflow-x: hidden; }
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background-image: linear-gradient(rgba(0,229,160,0.025) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(0,229,160,0.025) 1px, transparent 1px);
+    background-size: 40px 40px; pointer-events: none; z-index: 0;
+  }
+
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    background: rgba(10,10,15,0.9); backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border); padding: 0 2rem; height: 64px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .nav-logo { font-size: 1.2rem; font-weight: 800; letter-spacing: -0.02em; }
+  .nav-logo span { color: var(--accent); }
+  .nav-links { display: flex; gap: 0.5rem; align-items: center; }
+  .nav-links a {
+    color: var(--muted); text-decoration: none; font-size: 0.8rem; font-weight: 600;
+    padding: 0.45rem 0.9rem; border-radius: 8px; transition: all 0.2s;
+    letter-spacing: 0.04em; text-transform: uppercase;
+  }
+  .nav-links a:hover { color: var(--text); background: var(--surface2); }
+  .nav-links a.active { color: var(--accent); }
+  .logout-btn {
+    color: var(--muted); background: none; border: 1px solid var(--border);
+    padding: 0.4rem 0.75rem; border-radius: 8px; font-size: 0.75rem;
+    cursor: pointer; font-family: var(--font); transition: all 0.2s;
+  }
+  .logout-btn:hover { color: var(--danger); border-color: var(--danger); }
+
+  .layout {
+    position: relative; z-index: 1; padding-top: 64px;
+    display: grid; grid-template-columns: 1fr 1fr 340px;
+    min-height: 100vh; max-width: 1600px; margin: 0 auto;
+  }
+
+  .header {
+    grid-column: 1 / -1; padding: 2.5rem 2rem 2rem;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: flex-end; justify-content: space-between; gap: 2rem;
+  }
+  .header-left {}
+  .badge {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    font-family: var(--mono); font-size: 0.7rem; padding: 0.25rem 0.75rem;
+    border-radius: 100px; margin-bottom: 0.75rem;
+    text-transform: uppercase; letter-spacing: 0.1em;
+  }
+  .badge-green { background: rgba(0,229,160,0.1); border: 1px solid rgba(0,229,160,0.2); color: var(--accent); }
+  .pulse { width: 5px; height: 5px; border-radius: 50%; background: currentColor; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.7)} }
+  h1 { font-size: clamp(1.75rem, 3vw, 2.5rem); font-weight: 800; letter-spacing: -0.04em; }
+  h1 em { color: var(--accent); font-style: normal; }
+  .stats-mini { display: flex; gap: 1rem; }
+  .stat-mini { text-align: right; }
+  .stat-mini-val { font-size: 1.75rem; font-weight: 800; letter-spacing: -0.04em; }
+  .stat-mini-label { font-family: var(--mono); font-size: 0.65rem; color: var(--muted); text-transform: uppercase; }
+
+  /* Camera Panel */
+  .cam-panel { padding: 1.5rem; border-right: 1px solid var(--border); }
+  .section-label { font-family: var(--mono); font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; }
+
+  .cam-wrap {
+    position: relative; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; overflow: hidden; aspect-ratio: 4/3;
+  }
+  #videoFeed { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .cam-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 1rem; color: var(--muted); }
+  .corner { position: absolute; width: 20px; height: 20px; border-color: var(--accent); border-style: solid; border-width: 0; }
+  .corner.tl { top: 12px; left: 12px; border-top-width: 2px; border-left-width: 2px; border-radius: 3px 0 0 0; }
+  .corner.tr { top: 12px; right: 12px; border-top-width: 2px; border-right-width: 2px; border-radius: 0 3px 0 0; }
+  .corner.bl { bottom: 12px; left: 12px; border-bottom-width: 2px; border-left-width: 2px; border-radius: 0 0 0 3px; }
+  .corner.br { bottom: 12px; right: 12px; border-bottom-width: 2px; border-right-width: 2px; border-radius: 0 0 3px 0; }
+  .scan-line { position: absolute; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--accent), transparent); top: 0; display: none; }
+  .scanning .scan-line { display: block; animation: scanAnim 1.8s ease-in-out infinite; }
+  @keyframes scanAnim { 0%{top:0;opacity:0} 10%{opacity:1} 90%{opacity:1} 100%{top:100%;opacity:0} }
+
+  .cam-hud {
+    position: absolute; bottom: 10px; left: 10px; right: 10px;
+    background: rgba(0,0,0,0.7); backdrop-filter: blur(8px);
+    border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.75rem;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .cam-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
+  .cam-dot.live { background: var(--accent); animation: pulse 1.5s infinite; }
+  .hud-text { font-family: var(--mono); font-size: 0.7rem; color: var(--text); }
+
+  /* Liveness indicator */
+  .liveness-bar {
+    margin-top: 0.75rem; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 0.875rem 1rem;
+  }
+  .liveness-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; }
+  .liveness-label { font-family: var(--mono); font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+  .liveness-status { font-family: var(--mono); font-size: 0.75rem; font-weight: 500; }
+  .liveness-track { height: 4px; background: var(--surface2); border-radius: 2px; overflow: hidden; }
+  .liveness-fill { height: 100%; border-radius: 2px; background: var(--accent); width: 0%; transition: width 0.3s, background 0.3s; }
+
+  .steps { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+  .step {
+    flex: 1; padding: 0.4rem 0.5rem; border-radius: 6px;
+    background: var(--surface2); border: 1px solid var(--border);
+    font-family: var(--mono); font-size: 0.65rem; text-align: center;
+    color: var(--muted); transition: all 0.3s;
+  }
+  .step.active { background: rgba(0,229,160,0.1); border-color: rgba(0,229,160,0.3); color: var(--accent); }
+  .step.done { background: rgba(0,229,160,0.05); border-color: rgba(0,229,160,0.15); color: var(--accent); opacity: 0.6; }
+  .step.current { background: rgba(245,158,11,0.1); border-color: rgba(245,158,11,0.3); color: var(--warn); animation: blink 1s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+  .controls { display: flex; gap: 0.6rem; margin-top: 1rem; }
+  .btn {
+    flex: 1; padding: 0.8rem 1rem; border-radius: 9px; border: none;
+    font-family: var(--font); font-size: 0.85rem; font-weight: 700; cursor: pointer;
+    transition: all 0.2s; letter-spacing: 0.02em; text-transform: uppercase;
+  }
+  .btn-primary { background: var(--accent); color: #000; }
+  .btn-primary:hover { background: #00ffb3; transform: translateY(-1px); }
+  .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover { background: var(--border); }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+
+  canvas { display: none; }
+
+  /* Result panel */
+  .result-panel { padding: 1.5rem; border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 1.25rem; }
+
+  .result-card {
+    border-radius: 14px; padding: 1.5rem; border: 1px solid var(--border);
+    background: var(--surface); transition: all 0.3s;
+  }
+  .result-card.success { border-color: rgba(0,229,160,0.4); background: rgba(0,229,160,0.05); }
+  .result-card.error { border-color: rgba(239,68,68,0.4); background: rgba(239,68,68,0.05); }
+  .result-card.warning { border-color: rgba(245,158,11,0.4); background: rgba(245,158,11,0.05); }
+  .result-name { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.03em; margin: 0.5rem 0; }
+  .result-name.success { color: var(--accent); }
+  .result-name.error { color: var(--danger); }
+  .result-name.warning { color: var(--warn); }
+  .result-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+  .chip {
+    font-family: var(--mono); font-size: 0.7rem; padding: 0.25rem 0.6rem;
+    border-radius: 5px; background: var(--surface2); color: var(--muted);
+  }
+
+  /* Log */
+  .log-list { display: flex; flex-direction: column; gap: 0.4rem; max-height: 300px; overflow-y: auto; }
+  .log-item {
+    display: flex; align-items: center; gap: 0.65rem; padding: 0.65rem 0.75rem;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 9px;
+    animation: slideIn 0.3s ease;
+  }
+  @keyframes slideIn { from{opacity:0;transform:translateX(10px)} to{opacity:1;transform:translateX(0)} }
+  .log-av {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent2), var(--accent));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.75rem; font-weight: 700; color: white; flex-shrink: 0;
+  }
+  .log-name { font-size: 0.8rem; font-weight: 600; }
+  .log-meta { font-family: var(--mono); font-size: 0.65rem; color: var(--muted); }
+  .log-badge { font-size: 0.6rem; font-family: var(--mono); padding: 0.15rem 0.4rem; border-radius: 4px; background: rgba(0,229,160,0.12); color: var(--accent); text-transform: uppercase; flex-shrink: 0; }
+  .empty-state { text-align: center; padding: 2rem 1rem; color: var(--muted); font-family: var(--mono); font-size: 0.75rem; }
+
+  /* AI Panel */
+  .ai-panel { padding: 1.5rem; display: flex; flex-direction: column; background: var(--surface); }
+  .ai-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem; }
+  .ai-icon {
+    width: 40px; height: 40px; border-radius: 10px;
+    background: linear-gradient(135deg, rgba(124,58,237,0.2), rgba(0,229,160,0.2));
+    border: 1px solid rgba(124,58,237,0.3);
+    display: flex; align-items: center; justify-content: center; font-size: 1.1rem;
+  }
+  .ai-title { font-size: 1rem; font-weight: 800; letter-spacing: -0.02em; }
+  .ai-sub { font-family: var(--mono); font-size: 0.65rem; color: var(--muted); }
+
+  .chat-area { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1rem; min-height: 200px; max-height: 400px; }
+  .msg { padding: 0.75rem 1rem; border-radius: 10px; font-size: 0.85rem; line-height: 1.5; animation: slideIn 0.3s ease; }
+  .msg.system { background: var(--surface2); color: var(--muted); font-family: var(--mono); font-size: 0.75rem; }
+  .msg.user { background: rgba(124,58,237,0.15); border: 1px solid rgba(124,58,237,0.2); color: var(--text); margin-left: 1rem; }
+  .msg.ai { background: rgba(0,229,160,0.08); border: 1px solid rgba(0,229,160,0.15); color: var(--text); margin-right: 1rem; white-space: pre-wrap; }
+  .msg.loading { background: var(--surface2); border: 1px solid var(--border); }
+  .typing { display: flex; gap: 4px; align-items: center; padding: 0.25rem 0; }
+  .typing span { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: bounce 1.2s infinite; }
+  .typing span:nth-child(2) { animation-delay: 0.2s; }
+  .typing span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+
+  .quick-btns { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 1rem; }
+  .quick-btn {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--muted);
+    padding: 0.5rem 0.75rem; border-radius: 8px; cursor: pointer; text-align: left;
+    font-family: var(--mono); font-size: 0.7rem; transition: all 0.2s;
+  }
+  .quick-btn:hover { border-color: var(--accent2); color: var(--text); }
+
+  .ai-input-row { display: flex; gap: 0.5rem; }
+  .ai-input {
+    flex: 1; background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); padding: 0.75rem 1rem; border-radius: 9px;
+    font-family: var(--font); font-size: 0.85rem; outline: none; transition: all 0.2s;
+  }
+  .ai-input:focus { border-color: var(--accent2); }
+  .ai-input::placeholder { color: var(--muted); font-size: 0.8rem; }
+  .ai-send {
+    background: var(--accent2); color: white; border: none; padding: 0.75rem 1rem;
+    border-radius: 9px; cursor: pointer; font-size: 1rem; transition: all 0.2s;
+  }
+  .ai-send:hover { background: #8b5cf6; }
+  .ai-send:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .toast {
+    position: fixed; bottom: 1.5rem; left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--surface2); border: 1px solid var(--border);
+    padding: 0.75rem 1.25rem; border-radius: 10px; font-size: 0.875rem; font-weight: 600;
+    transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1); z-index: 999;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.success { border-color: rgba(0,229,160,0.5); color: var(--accent); }
+  .toast.error { border-color: rgba(239,68,68,0.5); color: var(--danger); }
+
+  @media (max-width: 1100px) {
+    .layout { grid-template-columns: 1fr 1fr; }
+    .ai-panel { grid-column: 1 / -1; border-top: 1px solid var(--border); }
+    .result-panel { border-right: none; }
+  }
+  @media (max-width: 720px) {
+    .layout { grid-template-columns: 1fr; }
+    .cam-panel, .result-panel { border-right: none; border-bottom: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">Face<span>Attend</span></div>
+  <div class="nav-links">
+    <a href="/" class="active">Mark</a>
+    <a href="/register">Register</a>
+    <a href="/report">Reports</a>
+    <button class="logout-btn" onclick="location.href='/logout'">Logout</button>
+  </div>
+</nav>
+
+<div class="layout">
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <div class="badge badge-green"><div class="pulse"></div> Live System</div>
+      <h1>Mark <em>Attendance</em></h1>
+    </div>
+    <div class="stats-mini">
+      <div class="stat-mini">
+        <div class="stat-mini-val" id="todayStat" style="color:var(--accent)">0</div>
+        <div class="stat-mini-label">Today</div>
+      </div>
+      <div class="stat-mini">
+        <div class="stat-mini-val" id="regStat" style="color:var(--accent2)">0</div>
+        <div class="stat-mini-label">Registered</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Camera -->
+  <div class="cam-panel">
+    <div class="section-label"><span>// Camera Feed</span> <span id="fpsLabel" style="color:var(--accent)"></span></div>
+
+    <div class="cam-wrap" id="camWrap">
+      <div class="cam-placeholder" id="camPlaceholder">
+        <div style="font-size:2.5rem;opacity:.25">📷</div>
+        <p style="font-family:var(--mono);font-size:.8rem">Start camera to begin</p>
+      </div>
+      <video id="videoFeed" autoplay playsinline style="display:none;"></video>
+      <canvas id="canvas"></canvas>
+      <div style="position:absolute;inset:0;pointer-events:none">
+        <div class="corner tl"></div><div class="corner tr"></div>
+        <div class="corner bl"></div><div class="corner br"></div>
+        <div class="scan-line" id="scanLine"></div>
+      </div>
+      <div class="cam-hud">
+        <div class="cam-dot" id="camDot"></div>
+        <span class="hud-text" id="hudText">Camera off</span>
+        <span style="font-family:var(--mono);font-size:.65rem;color:var(--muted)" id="earDisplay"></span>
+      </div>
+    </div>
+
+    <!-- Liveness Detection -->
+    <div class="liveness-bar" id="livenessBar">
+      <div class="liveness-row">
+        <span class="liveness-label">🛡 Liveness Detection</span>
+        <span class="liveness-status" id="livenessStatus" style="color:var(--muted)">Inactive</span>
+      </div>
+      <div class="liveness-track"><div class="liveness-fill" id="livenessFill"></div></div>
+      <div class="steps" style="margin-top:.6rem">
+        <div class="step" id="step1">1. Face</div>
+        <div class="step" id="step2">2. Blink</div>
+        <div class="step" id="step3">3. Hold</div>
+        <div class="step" id="step4">✓ Live</div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" id="startBtn" onclick="startCamera()">▶ Start</button>
+      <button class="btn btn-primary" id="scanBtn" onclick="startLiveness()" disabled>⚡ Mark Attendance</button>
+    </div>
+  </div>
+
+  <!-- Result + Log -->
+  <div class="result-panel">
+    <div class="section-label">// Scan Result</div>
+    <div class="result-card" id="resultCard">
+      <div style="font-family:var(--mono);font-size:.65rem;color:var(--muted)">LAST SCAN</div>
+      <div class="result-name" id="resultName" style="color:var(--muted);font-size:1rem">Awaiting scan...</div>
+      <div class="result-chips" id="resultChips"></div>
+    </div>
+
+    <div>
+      <div class="section-label">// Today's Log <span id="logDate" style="color:var(--accent)"></span></div>
+      <div class="log-list" id="logList">
+        <div class="empty-state">No records yet today</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Assistant -->
+  <div class="ai-panel">
+    <div class="ai-header">
+      <div class="ai-icon">🤖</div>
+      <div><div class="ai-title">AI Assistant</div><div class="ai-sub">// Ask anything about attendance</div></div>
+    </div>
+
+    <div class="chat-area" id="chatArea">
+      <div class="msg system">Hello! I can answer questions about attendance data. Try the quick buttons below or type your own question.</div>
+    </div>
+
+    <div class="quick-btns" id="quickBtns">
+      <button class="quick-btn" onclick="askAI('Who is absent today?')">❌ Who is absent today?</button>
+      <button class="quick-btn" onclick="askAI('Summarize today\'s attendance')">📊 Summarize today\'s attendance</button>
+      <button class="quick-btn" onclick="askAI('Top 5 most regular students this week')">🏆 Top 5 most regular this week</button>
+      <button class="quick-btn" onclick="askAI('How many students are present today?')">🔢 How many present today?</button>
+    </div>
+
+    <div class="ai-input-row">
+      <input class="ai-input" type="text" id="aiInput" placeholder="Ask about attendance..." onkeydown="if(event.key==='Enter') sendAI()"/>
+      <button class="ai-send" id="aiSendBtn" onclick="sendAI()">➤</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── State ────────────────────────────────────────────────────────
+let stream = null;
+let livenessState = { active: false, step: 0, earHistory: [], blinkCount: 0, holdFrames: 0, passed: false };
+let livenessInterval = null;
+let isRecognizing = false;
+
+// ─── Camera ──────────────────────────────────────────────────────
+async function startCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720, facingMode: 'user' } });
+    const v = document.getElementById('videoFeed');
+    v.srcObject = stream; v.style.display = 'block';
+    document.getElementById('camPlaceholder').style.display = 'none';
+    document.getElementById('startBtn').textContent = '■ Stop';
+    document.getElementById('startBtn').onclick = stopCamera;
+    document.getElementById('scanBtn').disabled = false;
+    document.getElementById('camDot').classList.add('live');
+    document.getElementById('hudText').textContent = 'Camera live';
+    loadLog(); loadStats();
+  } catch(e) { showToast('Camera access denied', 'error'); }
+}
+
+function stopCamera() {
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  stopLiveness();
+  document.getElementById('videoFeed').style.display = 'none';
+  document.getElementById('camPlaceholder').style.display = 'flex';
+  document.getElementById('startBtn').textContent = '▶ Start';
+  document.getElementById('startBtn').onclick = startCamera;
+  document.getElementById('scanBtn').disabled = true;
+  document.getElementById('camDot').classList.remove('live');
+  document.getElementById('hudText').textContent = 'Camera off';
+  document.getElementById('earDisplay').textContent = '';
+  resetLivenessUI();
+}
+
+// ─── Liveness Detection ───────────────────────────────────────────
+function startLiveness() {
+  if (livenessState.active) return;
+  livenessState = { active: true, step: 1, earHistory: [], blinkCount: 0, holdFrames: 0, passed: false };
+  document.getElementById('scanBtn').disabled = true;
+  document.getElementById('livenessStatus').textContent = 'Starting...';
+  document.getElementById('livenessStatus').style.color = 'var(--warn)';
+  setStep(1);
+  livenessInterval = setInterval(runLivenessFrame, 250);
+}
+
+function stopLiveness() {
+  if (livenessInterval) { clearInterval(livenessInterval); livenessInterval = null; }
+  livenessState.active = false;
+}
+
+function resetLivenessUI() {
+  document.getElementById('livenessFill').style.width = '0%';
+  document.getElementById('livenessStatus').textContent = 'Inactive';
+  document.getElementById('livenessStatus').style.color = 'var(--muted)';
+  ['step1','step2','step3','step4'].forEach(id => document.getElementById(id).className = 'step');
+  document.getElementById('scanBtn').disabled = !stream;
+  document.getElementById('hudText').textContent = stream ? 'Camera live' : 'Camera off';
+}
+
+function setStep(n) {
+  ['step1','step2','step3','step4'].forEach((id, i) => {
+    const el = document.getElementById(id);
+    if (i + 1 < n) el.className = 'step done';
+    else if (i + 1 === n) el.className = 'step current';
+    else el.className = 'step';
+  });
+  document.getElementById('livenessFill').style.width = `${(n-1) * 33}%`;
+}
+
+async function runLivenessFrame() {
+  if (!livenessState.active) return;
+
+  const video = document.getElementById('videoFeed');
+  const canvas = document.getElementById('canvas');
+  canvas.width = video.videoWidth || 640;
+  canvas.height = video.videoHeight || 480;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  const imageData = canvas.toDataURL('image/jpeg', 0.7);
+
+  try {
+    const res = await fetch('/api/liveness_check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: imageData })
+    });
+    const data = await res.json();
+
+    if (!data.success || !data.face_detected) {
+      document.getElementById('hudText').textContent = 'No face detected — position yourself';
+      return;
+    }
+
+    const ear = data.ear;
+    document.getElementById('earDisplay').textContent = `EAR: ${ear.toFixed(3)}`;
+    document.getElementById('hudText').textContent = `EAR: ${ear.toFixed(3)} | Step ${livenessState.step}/3`;
+
+    const history = livenessState.earHistory;
+    history.push(ear);
+    if (history.length > 8) history.shift();
+
+    const EAR_BLINK = 0.22;
+
+    // Step 1: Detect face
+    if (livenessState.step === 1) {
+      document.getElementById('livenessStatus').textContent = 'Face detected ✓';
+      livenessState.step = 2;
+      setStep(2);
+      document.getElementById('hudText').textContent = '👁 Now BLINK twice!';
+    }
+
+    // Step 2: Blink detection
+    if (livenessState.step === 2) {
+      if (history.length >= 2) {
+        const prev = history[history.length - 2];
+        const curr = history[history.length - 1];
+        if (prev > EAR_BLINK && curr <= EAR_BLINK) {
+          livenessState.blinkCount++;
+          document.getElementById('hudText').textContent = `Blink ${livenessState.blinkCount}/2 detected!`;
+          document.getElementById('livenessStatus').textContent = `Blink ${livenessState.blinkCount}/2`;
+        }
+      }
+      if (livenessState.blinkCount >= 2) {
+        livenessState.step = 3;
+        livenessState.holdFrames = 0;
+        setStep(3);
+        document.getElementById('hudText').textContent = '✅ Blinks OK! Hold still...';
+      }
+    }
+
+    // Step 3: Hold still
+    if (livenessState.step === 3) {
+      livenessState.holdFrames++;
+      document.getElementById('livenessStatus').textContent = `Hold still... ${livenessState.holdFrames}/6`;
+      if (livenessState.holdFrames >= 6) {
+        livenessState.step = 4;
+        livenessState.passed = true;
+        setStep(4);
+        stopLiveness();
+        document.getElementById('livenessFill').style.width = '100%';
+        document.getElementById('livenessFill').style.background = 'var(--accent)';
+        document.getElementById('livenessStatus').textContent = '✅ LIVE PERSON CONFIRMED';
+        document.getElementById('livenessStatus').style.color = 'var(--accent)';
+        document.getElementById('hudText').textContent = 'Liveness passed! Recognizing...';
+        showToast('✅ Liveness check passed!', 'success');
+        setTimeout(doRecognize, 500);
+      }
+    }
+  } catch(e) {
+    document.getElementById('hudText').textContent = 'Server error — retrying...';
+  }
+}
+
+// ─── Recognition ──────────────────────────────────────────────────
+async function doRecognize() {
+  if (isRecognizing) return;
+  isRecognizing = true;
+  document.getElementById('camWrap').classList.add('scanning');
+
+  const video = document.getElementById('videoFeed');
+  const canvas = document.getElementById('canvas');
+  canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  const imageData = canvas.toDataURL('image/jpeg', 0.92);
+
+  try {
+    const res = await fetch('/api/recognize', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: imageData })
+    });
+    const data = await res.json();
+    document.getElementById('camWrap').classList.remove('scanning');
+
+    if (data.success && data.results?.length > 0) {
+      const r = data.results[0];
+      const card = document.getElementById('resultCard');
+      const nameEl = document.getElementById('resultName');
+      const chips = document.getElementById('resultChips');
+
+      if (r.status === 'marked') {
+        card.className = 'result-card success';
+        nameEl.className = 'result-name success';
+        nameEl.textContent = r.name;
+        chips.innerHTML = `
+          <span class="chip">✓ Present</span>
+          <span class="chip">${r.confidence}% match</span>
+          ${r.roll_no ? `<span class="chip">Roll: ${r.roll_no}</span>` : ''}
+          ${r.reg_no ? `<span class="chip">Reg: ${r.reg_no}</span>` : ''}
+          <span class="chip">${r.time || new Date().toLocaleTimeString()}</span>`;
+        showToast(`✅ Attendance marked for ${r.name}`, 'success');
+        loadLog(); loadStats();
+      } else if (r.status === 'already_marked') {
+        card.className = 'result-card warning';
+        nameEl.className = 'result-name warning';
+        nameEl.textContent = r.name;
+        chips.innerHTML = `<span class="chip">⚠ Already marked</span><span class="chip">${r.confidence}% match</span>`;
+        showToast(`⚠ ${r.name} already marked today`, 'error');
+      } else {
+        card.className = 'result-card error';
+        nameEl.className = 'result-name error';
+        nameEl.textContent = 'Unknown Face';
+        chips.innerHTML = `<span class="chip">Not registered</span>`;
+        showToast('❌ Face not recognized', 'error');
+      }
+    } else {
+      showToast(data.message || 'Recognition failed', 'error');
+    }
+  } catch(e) {
+    showToast('Server error. Is backend running?', 'error');
+  }
+
+  document.getElementById('camWrap').classList.remove('scanning');
+  setTimeout(() => { resetLivenessUI(); isRecognizing = false; }, 1000);
+}
+
+// ─── AI Chat ──────────────────────────────────────────────────────
+function askAI(q) { document.getElementById('aiInput').value = q; sendAI(); }
+
+async function sendAI() {
+  const input = document.getElementById('aiInput');
+  const query = input.value.trim();
+  if (!query) return;
+
+  const chat = document.getElementById('chatArea');
+  input.value = '';
+  document.getElementById('aiSendBtn').disabled = true;
+  document.getElementById('quickBtns').style.display = 'none';
+
+  chat.innerHTML += `<div class="msg user">${escapeHtml(query)}</div>`;
+  chat.innerHTML += `<div class="msg loading" id="aiLoading"><div class="typing"><span></span><span></span><span></span></div></div>`;
+  chat.scrollTop = chat.scrollHeight;
+
+  try {
+    const res = await fetch('/api/ai_query', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query })
+    });
+    const data = await res.json();
+    document.getElementById('aiLoading').remove();
+    chat.innerHTML += `<div class="msg ai">${escapeHtml(data.answer || 'No response.')}</div>`;
+  } catch(e) {
+    document.getElementById('aiLoading').remove();
+    chat.innerHTML += `<div class="msg ai">⚠ Could not reach server.</div>`;
+  }
+  chat.scrollTop = chat.scrollHeight;
+  document.getElementById('aiSendBtn').disabled = false;
+}
+
+function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
+
+// ─── Data Loaders ─────────────────────────────────────────────────
+async function loadLog() {
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('logDate').textContent = today;
+  try {
+    const res = await fetch(`/api/attendance?date=${today}`);
+    const data = await res.json();
+    const list = document.getElementById('logList');
+    if (data.records?.length > 0) {
+      list.innerHTML = data.records.map(r => `
+        <div class="log-item">
+          <div class="log-av">${r.name.charAt(0).toUpperCase()}</div>
+          <div style="flex:1;min-width:0">
+            <div class="log-name">${r.name}</div>
+            <div class="log-meta">${r.roll_no ? 'Roll: '+r.roll_no+' · ' : ''}${r.time}</div>
+          </div>
+          <div class="log-badge">Present</div>
+        </div>`).join('');
+    } else {
+      list.innerHTML = '<div class="empty-state">No records yet today</div>';
+    }
+    document.getElementById('todayStat').textContent = data.records?.length || 0;
+  } catch(e) {}
+}
+
+async function loadStats() {
+  try {
+    const res = await fetch('/api/stats');
+    const d = await res.json();
+    document.getElementById('todayStat').textContent = d.today || 0;
+    document.getElementById('regStat').textContent = d.users || 0;
+  } catch(e) {}
+}
+
+function showToast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = `toast ${type} show`;
+  setTimeout(() => t.className = 'toast', 3200);
+}
+
+document.getElementById('logDate').textContent = new Date().toISOString().split('T')[0];
+loadLog(); loadStats();
+</script>
+</body>
+</html>

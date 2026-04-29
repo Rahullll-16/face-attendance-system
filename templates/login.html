@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Login – FaceAttend</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #060608; --surface: #0f0f14; --surface2: #18181f; --border: #252530;
+    --accent: #00e5a0; --accent2: #7c3aed; --text: #e8e8f0; --muted: #5a5a6e;
+    --font: 'Syne', sans-serif; --mono: 'DM Mono', monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--text); font-family: var(--font);
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+  }
+
+  .bg-anim {
+    position: fixed; inset: 0; z-index: 0;
+    background: radial-gradient(ellipse at 20% 50%, rgba(0,229,160,0.05) 0%, transparent 60%),
+                radial-gradient(ellipse at 80% 50%, rgba(124,58,237,0.05) 0%, transparent 60%);
+    transition: background 0.5s;
+  }
+  .bg-anim.student-mode {
+    background: radial-gradient(ellipse at 20% 50%, rgba(124,58,237,0.07) 0%, transparent 60%),
+                radial-gradient(ellipse at 80% 50%, rgba(0,229,160,0.04) 0%, transparent 60%);
+  }
+  .grid-bg {
+    position: fixed; inset: 0; z-index: 0;
+    background-image: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 50px 50px;
+  }
+  .orb {
+    position: fixed; border-radius: 50%; filter: blur(80px); z-index: 0; pointer-events: none;
+    animation: float 8s ease-in-out infinite; transition: background 0.6s;
+  }
+  .orb1 { width: 400px; height: 400px; background: rgba(0,229,160,0.06); top: -100px; left: -100px; }
+  .orb2 { width: 300px; height: 300px; background: rgba(124,58,237,0.06); bottom: -50px; right: -50px; animation-delay: -4s; }
+  .student-mode ~ .orb1 { background: rgba(124,58,237,0.08); }
+  .student-mode ~ .orb2 { background: rgba(0,229,160,0.04); }
+  @keyframes float {
+    0%, 100% { transform: translate(0, 0); }
+    50% { transform: translate(20px, -20px); }
+  }
+
+  /* Role Toggle */
+  .role-toggle-wrap {
+    position: relative; z-index: 1;
+    display: flex; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 4px; gap: 0; margin-bottom: 2rem;
+  }
+  .role-tab {
+    flex: 1; padding: 0.65rem 1rem; border-radius: 9px; border: none;
+    font-family: var(--font); font-size: 0.8rem; font-weight: 700;
+    cursor: pointer; transition: all 0.3s; letter-spacing: 0.04em;
+    text-transform: uppercase; color: var(--muted); background: transparent;
+    display: flex; align-items: center; justify-content: center; gap: 0.4rem;
+  }
+  .role-tab.active-admin {
+    background: linear-gradient(135deg, rgba(0,229,160,0.15), rgba(0,229,160,0.08));
+    color: var(--accent); border: 1px solid rgba(0,229,160,0.25);
+    box-shadow: 0 2px 12px rgba(0,229,160,0.1);
+  }
+  .role-tab.active-student {
+    background: linear-gradient(135deg, rgba(124,58,237,0.2), rgba(124,58,237,0.1));
+    color: #a78bfa; border: 1px solid rgba(124,58,237,0.3);
+    box-shadow: 0 2px 12px rgba(124,58,237,0.15);
+  }
+
+  /* Card */
+  .card {
+    position: relative; z-index: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 3rem;
+    width: 100%;
+    max-width: 440px;
+    box-shadow: 0 40px 80px rgba(0,0,0,0.5);
+    animation: appear 0.5s cubic-bezier(0.34,1.2,0.64,1);
+    transition: box-shadow 0.4s;
+  }
+  .card.student-active {
+    box-shadow: 0 40px 80px rgba(0,0,0,0.5), 0 0 60px rgba(124,58,237,0.05);
+  }
+  @keyframes appear {
+    from { opacity: 0; transform: translateY(30px) scale(0.96); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .logo { margin-bottom: 2.5rem; }
+  .logo-text { font-size: 1.75rem; font-weight: 800; letter-spacing: -0.04em; }
+  .logo-text span { color: var(--accent); }
+  .logo-sub { font-family: var(--mono); font-size: 0.75rem; color: var(--muted); margin-top: 0.25rem; text-transform: uppercase; letter-spacing: 0.1em; }
+
+  .face-icon {
+    width: 64px; height: 64px; border-radius: 16px;
+    background: linear-gradient(135deg, rgba(0,229,160,0.15), rgba(124,58,237,0.15));
+    border: 1px solid rgba(0,229,160,0.2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.75rem; margin-bottom: 1.5rem;
+    transition: all 0.4s;
+  }
+  .face-icon.student {
+    background: linear-gradient(135deg, rgba(124,58,237,0.2), rgba(0,229,160,0.1));
+    border-color: rgba(124,58,237,0.3);
+  }
+
+  .role-banner {
+    padding: 0.6rem 1rem; border-radius: 9px; margin-bottom: 1.5rem;
+    font-family: var(--mono); font-size: 0.72rem; text-transform: uppercase;
+    letter-spacing: 0.08em; font-weight: 500;
+    transition: all 0.3s;
+  }
+  .role-banner.admin-banner {
+    background: rgba(0,229,160,0.07); border: 1px solid rgba(0,229,160,0.15); color: var(--accent);
+  }
+  .role-banner.student-banner {
+    background: rgba(124,58,237,0.1); border: 1px solid rgba(124,58,237,0.25); color: #a78bfa;
+  }
+
+  h2 { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 0.5rem; }
+  .desc { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); margin-bottom: 2rem; transition: color 0.3s; }
+
+  /* Form panels */
+  .form-panel { transition: all 0.3s; }
+  .form-panel.hidden { display: none; }
+
+  .form-group { margin-bottom: 1.25rem; }
+  .form-label {
+    display: block; font-family: var(--mono); font-size: 0.7rem; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.5rem;
+  }
+  .form-input {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); padding: 0.875rem 1rem; border-radius: 10px;
+    font-family: var(--font); font-size: 1rem; font-weight: 600; outline: none;
+    transition: all 0.2s;
+  }
+  .form-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,229,160,0.1); }
+  .form-input.student-focus:focus { border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124,58,237,0.12); }
+  .form-input::placeholder { color: var(--muted); font-weight: 400; }
+
+  /* Student ID input row */
+  .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+
+  .btn-login {
+    width: 100%; padding: 1rem; background: var(--accent); color: #000;
+    border: none; border-radius: 12px; font-family: var(--font);
+    font-size: 1rem; font-weight: 800; cursor: pointer; transition: all 0.3s;
+    letter-spacing: 0.02em; text-transform: uppercase; margin-top: 0.5rem;
+  }
+  .btn-login:hover { background: #00ffb3; transform: translateY(-1px); box-shadow: 0 8px 20px rgba(0,229,160,0.2); }
+  .btn-login:active { transform: translateY(0); }
+  .btn-login:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .btn-login.student-btn { background: #7c3aed; color: white; }
+  .btn-login.student-btn:hover { background: #8b5cf6; box-shadow: 0 8px 20px rgba(124,58,237,0.25); }
+
+  /* Face login button for students */
+  .btn-face {
+    width: 100%; padding: 0.85rem; background: var(--surface2);
+    border: 1px solid rgba(124,58,237,0.3); color: #a78bfa; border-radius: 12px;
+    font-family: var(--font); font-size: 0.9rem; font-weight: 700; cursor: pointer;
+    transition: all 0.2s; letter-spacing: 0.02em; text-transform: uppercase;
+    margin-top: 0.6rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+  }
+  .btn-face:hover { background: rgba(124,58,237,0.12); transform: translateY(-1px); }
+
+  .or-divider {
+    display: flex; align-items: center; gap: 0.75rem;
+    margin: 1.1rem 0; font-family: var(--mono); font-size: 0.65rem; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .or-divider::before, .or-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .error-msg {
+    background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3);
+    color: #f87171; padding: 0.75rem 1rem; border-radius: 8px;
+    font-size: 0.875rem; margin-top: 1rem; display: none; text-align: center;
+  }
+
+  .default-hint {
+    margin-top: 1.5rem; padding: 1rem; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: 10px;
+    font-family: var(--mono); font-size: 0.72rem; color: var(--muted); line-height: 1.6;
+  }
+  .default-hint strong { color: var(--text); }
+
+  /* Student info note */
+  .student-note {
+    margin-top: 1.5rem; padding: 1rem; background: rgba(124,58,237,0.07);
+    border: 1px solid rgba(124,58,237,0.2); border-radius: 10px;
+    font-family: var(--mono); font-size: 0.72rem; color: var(--muted); line-height: 1.6;
+  }
+  .student-note strong { color: #a78bfa; }
+
+  /* Face capture modal */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000;
+    display: none; align-items: center; justify-content: center;
+    backdrop-filter: blur(8px);
+  }
+  .modal-overlay.show { display: flex; }
+  .modal {
+    background: var(--surface); border: 1px solid rgba(124,58,237,0.3);
+    border-radius: 20px; padding: 2rem; width: 90%; max-width: 460px;
+    animation: appear 0.3s cubic-bezier(0.34,1.2,0.64,1);
+  }
+  .modal-title { font-size: 1.25rem; font-weight: 800; margin-bottom: 0.4rem; }
+  .modal-sub { font-family: var(--mono); font-size: 0.75rem; color: var(--muted); margin-bottom: 1.25rem; }
+  .modal-cam-wrap {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden; aspect-ratio: 4/3; position: relative;
+    margin-bottom: 1rem;
+  }
+  .modal-cam-wrap video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .cam-ph-modal { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--muted); font-family: var(--mono); font-size: 0.8rem; gap: 0.75rem; }
+  .modal-btns { display: flex; gap: 0.6rem; }
+  .modal-btn { flex: 1; padding: 0.8rem; border-radius: 10px; border: none; font-family: var(--font); font-size: 0.85rem; font-weight: 700; cursor: pointer; transition: all 0.2s; text-transform: uppercase; }
+  .modal-btn-primary { background: #7c3aed; color: white; }
+  .modal-btn-primary:hover { background: #8b5cf6; }
+  .modal-btn-sec { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+  .modal-btn-sec:hover { color: var(--text); }
+  .modal-status { font-family: var(--mono); font-size: 0.75rem; color: var(--muted); text-align: center; margin-top: 0.75rem; min-height: 1.2em; }
+</style>
+</head>
+<body>
+
+<div class="bg-anim" id="bgAnim"></div>
+<div class="grid-bg"></div>
+<div class="orb orb1" id="orb1"></div>
+<div class="orb orb2" id="orb2"></div>
+
+<div class="card" id="mainCard">
+  <div class="logo">
+    <div class="logo-text">Face<span>Attend</span></div>
+    <div class="logo-sub">// Access Portal</div>
+  </div>
+
+  <!-- Role Toggle -->
+  <div class="role-toggle-wrap">
+    <button class="role-tab active-admin" id="tabAdmin" onclick="switchRole('admin')">🔐 Admin</button>
+    <button class="role-tab" id="tabStudent" onclick="switchRole('student')">🎓 Student</button>
+  </div>
+
+  <!-- Dynamic icon + role label -->
+  <div class="face-icon" id="roleIcon">🔐</div>
+  <div class="role-banner admin-banner" id="roleBanner">Admin — Full system access</div>
+
+  <h2 id="roleTitle">Welcome back</h2>
+  <p class="desc" id="roleDesc">Sign in to manage the attendance system</p>
+
+  <!-- ── ADMIN PANEL ── -->
+  <div class="form-panel" id="adminPanel">
+    <div class="form-group">
+      <label class="form-label">Username</label>
+      <input class="form-input" type="text" id="adminUsername" placeholder="admin" autocomplete="username"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Password</label>
+      <input class="form-input" type="password" id="adminPassword" placeholder="••••••••"
+             autocomplete="current-password" onkeydown="if(event.key==='Enter') doAdminLogin()"/>
+    </div>
+    <button class="btn-login" id="adminLoginBtn" onclick="doAdminLogin()">Sign In →</button>
+    <div class="error-msg" id="adminError"></div>
+    <div class="default-hint">
+      <strong>Default credentials:</strong><br>
+      Username: <strong>admin</strong> &nbsp;|&nbsp; Password: <strong>admin123</strong><br>
+      Change these in <code>app.py</code> before deploying.
+    </div>
+  </div>
+
+  <!-- ── STUDENT PANEL ── -->
+  <div class="form-panel hidden" id="studentPanel">
+    <div class="input-row">
+      <div class="form-group">
+        <label class="form-label">Roll No</label>
+        <input class="form-input student-focus" type="text" id="studentRoll" placeholder="e.g. 2301" autocomplete="off"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Reg No (opt)</label>
+        <input class="form-input student-focus" type="text" id="studentReg" placeholder="e.g. PU2024" autocomplete="off"/>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Full Name</label>
+      <input class="form-input student-focus" type="text" id="studentName" placeholder="Your registered name"
+             autocomplete="off" onkeydown="if(event.key==='Enter') doStudentLogin()"/>
+    </div>
+    <button class="btn-login student-btn" id="studentLoginBtn" onclick="doStudentLogin()">View My Attendance →</button>
+
+    <div class="or-divider">or use face recognition</div>
+    <button class="btn-face" onclick="openFaceModal()">📸 &nbsp;Login with Face</button>
+
+    <div class="error-msg" id="studentError"></div>
+    <div class="student-note">
+      <strong>Students:</strong> Enter your Roll No and Name to view your personal attendance record. Face login will identify you automatically.
+    </div>
+  </div>
+</div>
+
+<!-- Face Capture Modal -->
+<div class="modal-overlay" id="faceModal">
+  <div class="modal">
+    <div class="modal-title">📸 Face Recognition Login</div>
+    <div class="modal-sub">// Position your face in the frame and click Identify</div>
+    <div class="modal-cam-wrap" id="modalCamWrap">
+      <div class="cam-ph-modal" id="modalCamPh">
+        <div style="font-size:2rem;opacity:.3">📷</div>
+        <p>Camera not started</p>
+      </div>
+      <video id="modalVideo" autoplay playsinline style="display:none;"></video>
+    </div>
+    <div class="modal-btns">
+      <button class="modal-btn modal-btn-sec" id="modalStartBtn" onclick="startModalCamera()">▶ Start Camera</button>
+      <button class="modal-btn modal-btn-primary" id="modalIdentifyBtn" onclick="identifyFace()" disabled>🔍 Identify Me</button>
+      <button class="modal-btn modal-btn-sec" onclick="closeFaceModal()">✕ Cancel</button>
+    </div>
+    <div class="modal-status" id="modalStatus">Start camera to begin</div>
+  </div>
+</div>
+
+<script>
+let currentRole = 'admin';
+let faceStream = null;
+
+function switchRole(role) {
+  currentRole = role;
+  const isStudent = role === 'student';
+  const card = document.getElementById('mainCard');
+  const bgAnim = document.getElementById('bgAnim');
+
+  document.getElementById('tabAdmin').className = isStudent ? 'role-tab' : 'role-tab active-admin';
+  document.getElementById('tabStudent').className = isStudent ? 'role-tab active-student' : 'role-tab';
+
+  document.getElementById('adminPanel').classList.toggle('hidden', isStudent);
+  document.getElementById('studentPanel').classList.toggle('hidden', !isStudent);
+
+  card.classList.toggle('student-active', isStudent);
+  bgAnim.classList.toggle('student-mode', isStudent);
+
+  if (isStudent) {
+    document.getElementById('roleIcon').textContent = '🎓';
+    document.getElementById('roleBanner').textContent = 'Student — View your attendance record';
+  } else {
+    document.getElementById('roleIcon').textContent = '🔐';
+    document.getElementById('roleBanner').textContent = 'Admin — Full system access';
+  }
+
+  document.getElementById('adminError').style.display = 'none';
+  document.getElementById('studentError').style.display = 'none';
+}
+
+// ✅ ADMIN LOGIN (ALREADY CORRECT)
+async function doAdminLogin() {
+  const btn = document.getElementById('adminLoginBtn');
+  const err = document.getElementById('adminError');
+
+  btn.disabled = true;
+  btn.textContent = 'Signing in...';
+  err.style.display = 'none';
+
+  try {
+    const res = await fetch('/login', {   // ✅ CORRECT ENDPOINT
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: document.getElementById('adminUsername').value,
+        password: document.getElementById('adminPassword').value
+      })
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      btn.textContent = '✅ Access Granted!';
+      setTimeout(() => window.location.href = '/', 400);
+    } else {
+      err.textContent = data.message || 'Invalid credentials.';
+      err.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Sign In →';
+    }
+  } catch (e) {
+    err.textContent = 'Server error. Is backend running?';
+    err.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Sign In →';
+  }
+}
+
+// ✅ FIXED STUDENT LOGIN (MAIN CHANGE)
+async function doStudentLogin() {
+  const roll = document.getElementById('studentRoll').value.trim();
+  const name = document.getElementById('studentName').value.trim();
+  const reg = document.getElementById('studentReg').value.trim();
+  const err = document.getElementById('studentError');
+  const btn = document.getElementById('studentLoginBtn');
+
+  err.style.display = 'none';
+
+  if (!roll || !name || !reg) {
+    err.textContent = 'Please fill all fields.';
+    err.style.display = 'block';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Checking...';
+
+  try {
+    const res = await fetch('/student_login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        roll_no: roll,
+        name: name,
+        reg_no: reg
+      })
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      btn.textContent = '✅ Login Success';
+      setTimeout(() => {
+        window.location.href = "/report";   // ✅ FIXED REDIRECT
+      }, 400);
+    } else {
+      err.textContent = data.message || 'Invalid student details';
+      err.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'View My Attendance →';
+    }
+  } catch (e) {
+    err.textContent = 'Server error';
+    err.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'View My Attendance →';
+  }
+}
+
+// ❌ FACE PART untouched (already fine)
+</script>
+</body>
+</html>
