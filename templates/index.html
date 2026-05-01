@@ -181,32 +181,49 @@
   .ai-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem; }
   .ai-icon {
     width: 40px; height: 40px; border-radius: 10px;
-    background: linear-gradient(135deg, rgba(124,58,237,0.2), rgba(0,229,160,0.2));
-    border: 1px solid rgba(124,58,237,0.3);
+    background: linear-gradient(135deg, rgba(124,58,237,0.3), rgba(0,229,160,0.3));
+    border: 1px solid rgba(124,58,237,0.4);
     display: flex; align-items: center; justify-content: center; font-size: 1.1rem;
+    animation: iconGlow 3s ease-in-out infinite;
   }
+  @keyframes iconGlow { 0%,100%{box-shadow:0 0 8px rgba(124,58,237,0.2)} 50%{box-shadow:0 0 16px rgba(0,229,160,0.3)} }
   .ai-title { font-size: 1rem; font-weight: 800; letter-spacing: -0.02em; }
   .ai-sub { font-family: var(--mono); font-size: 0.65rem; color: var(--muted); }
+  .ai-header-actions { margin-left: auto; display: flex; gap: 0.4rem; }
+  .ai-clear-btn {
+    background: none; border: 1px solid var(--border); color: var(--muted); font-family: var(--mono);
+    font-size: 0.6rem; padding: 0.3rem 0.6rem; border-radius: 6px; cursor: pointer; transition: all 0.2s;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .ai-clear-btn:hover { border-color: var(--danger); color: var(--danger); }
 
-  .chat-area { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1rem; min-height: 200px; max-height: 400px; }
-  .msg { padding: 0.75rem 1rem; border-radius: 10px; font-size: 0.85rem; line-height: 1.5; animation: slideIn 0.3s ease; }
+  .chat-area { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1rem; min-height: 200px; max-height: 450px; scroll-behavior: smooth; }
+  .chat-area::-webkit-scrollbar { width: 4px; }
+  .chat-area::-webkit-scrollbar-track { background: transparent; }
+  .chat-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .msg { padding: 0.75rem 1rem; border-radius: 10px; font-size: 0.85rem; line-height: 1.6; animation: msgIn 0.35s cubic-bezier(0.34,1.56,0.64,1); }
+  @keyframes msgIn { from{opacity:0;transform:translateY(8px) scale(0.97)} to{opacity:1;transform:translateY(0) scale(1)} }
   .msg.system { background: var(--surface2); color: var(--muted); font-family: var(--mono); font-size: 0.75rem; }
-  .msg.user { background: rgba(124,58,237,0.15); border: 1px solid rgba(124,58,237,0.2); color: var(--text); margin-left: 1rem; }
-  .msg.ai { background: rgba(0,229,160,0.08); border: 1px solid rgba(0,229,160,0.15); color: var(--text); margin-right: 1rem; white-space: pre-wrap; }
+  .msg.user { background: rgba(124,58,237,0.15); border: 1px solid rgba(124,58,237,0.25); color: var(--text); margin-left: 1.5rem; border-bottom-right-radius: 3px; }
+  .msg.ai { background: rgba(0,229,160,0.06); border: 1px solid rgba(0,229,160,0.15); color: var(--text); margin-right: 1rem; border-bottom-left-radius: 3px; }
+  .msg.ai strong { color: var(--accent); }
   .msg.loading { background: var(--surface2); border: 1px solid var(--border); }
+  .msg-source { display: inline-block; font-family: var(--mono); font-size: 0.55rem; padding: 0.1rem 0.4rem; border-radius: 3px; margin-top: 0.5rem; text-transform: uppercase; letter-spacing: 0.06em; }
+  .msg-source.local { background: rgba(245,158,11,0.12); color: var(--warn); }
+  .msg-source.cloud { background: rgba(124,58,237,0.12); color: var(--accent2); }
   .typing { display: flex; gap: 4px; align-items: center; padding: 0.25rem 0; }
   .typing span { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: bounce 1.2s infinite; }
   .typing span:nth-child(2) { animation-delay: 0.2s; }
   .typing span:nth-child(3) { animation-delay: 0.4s; }
   @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
 
-  .quick-btns { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 1rem; }
+  .quick-btns { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 1rem; }
   .quick-btn {
     background: var(--surface2); border: 1px solid var(--border); color: var(--muted);
-    padding: 0.5rem 0.75rem; border-radius: 8px; cursor: pointer; text-align: left;
-    font-family: var(--mono); font-size: 0.7rem; transition: all 0.2s;
+    padding: 0.4rem 0.65rem; border-radius: 8px; cursor: pointer; text-align: left;
+    font-family: var(--mono); font-size: 0.65rem; transition: all 0.2s; white-space: nowrap;
   }
-  .quick-btn:hover { border-color: var(--accent2); color: var(--text); }
+  .quick-btn:hover { border-color: var(--accent2); color: var(--text); background: rgba(124,58,237,0.08); transform: translateY(-1px); }
 
   .ai-input-row { display: flex; gap: 0.5rem; }
   .ai-input {
@@ -214,14 +231,14 @@
     color: var(--text); padding: 0.75rem 1rem; border-radius: 9px;
     font-family: var(--font); font-size: 0.85rem; outline: none; transition: all 0.2s;
   }
-  .ai-input:focus { border-color: var(--accent2); }
+  .ai-input:focus { border-color: var(--accent2); box-shadow: 0 0 0 3px rgba(124,58,237,0.1); }
   .ai-input::placeholder { color: var(--muted); font-size: 0.8rem; }
   .ai-send {
-    background: var(--accent2); color: white; border: none; padding: 0.75rem 1rem;
+    background: linear-gradient(135deg, var(--accent2), #9333ea); color: white; border: none; padding: 0.75rem 1rem;
     border-radius: 9px; cursor: pointer; font-size: 1rem; transition: all 0.2s;
   }
-  .ai-send:hover { background: #8b5cf6; }
-  .ai-send:disabled { opacity: 0.4; cursor: not-allowed; }
+  .ai-send:hover { transform: scale(1.05); box-shadow: 0 4px 12px rgba(124,58,237,0.3); }
+  .ai-send:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
 
   .toast {
     position: fixed; bottom: 1.5rem; left: 50%;
@@ -341,22 +358,29 @@
   <div class="ai-panel">
     <div class="ai-header">
       <div class="ai-icon">🤖</div>
-      <div><div class="ai-title">AI Assistant</div><div class="ai-sub">// Ask anything about attendance</div></div>
+      <div><div class="ai-title">AI Assistant</div><div class="ai-sub">// Smart attendance insights</div></div>
+      <div class="ai-header-actions">
+        <button class="ai-clear-btn" onclick="clearChat()" title="Clear chat">✕ Clear</button>
+      </div>
     </div>
 
     <div class="chat-area" id="chatArea">
-      <div class="msg system">Hello! I can answer questions about attendance data. Try the quick buttons below or type your own question.</div>
+      <div class="msg system">👋 I'm your intelligent attendance assistant. Ask me anything — I understand natural language! Try the buttons below or type freely.</div>
     </div>
 
     <div class="quick-btns" id="quickBtns">
-      <button class="quick-btn" onclick="askAI('Who is absent today?')">❌ Who is absent today?</button>
-      <button class="quick-btn" onclick="askAI('Summarize today\'s attendance')">📊 Summarize today\'s attendance</button>
-      <button class="quick-btn" onclick="askAI('Top 5 most regular students this week')">🏆 Top 5 most regular this week</button>
-      <button class="quick-btn" onclick="askAI('How many students are present today?')">🔢 How many present today?</button>
+      <button class="quick-btn" onclick="askAI('Who is absent today?')">❌ Absent today</button>
+      <button class="quick-btn" onclick="askAI('Summarize today')">📊 Summary</button>
+      <button class="quick-btn" onclick="askAI('Top 5 most regular')">🏆 Top regular</button>
+      <button class="quick-btn" onclick="askAI('Who came late today?')">⏰ Late arrivals</button>
+      <button class="quick-btn" onclick="askAI('Attendance percentage')">📈 Rate %</button>
+      <button class="quick-btn" onclick="askAI('This week attendance')">📅 This week</button>
+      <button class="quick-btn" onclick="askAI('Who arrived first today?')">🌅 Early birds</button>
+      <button class="quick-btn" onclick="askAI('help')">❓ Help</button>
     </div>
 
     <div class="ai-input-row">
-      <input class="ai-input" type="text" id="aiInput" placeholder="Ask about attendance..." onkeydown="if(event.key==='Enter') sendAI()"/>
+      <input class="ai-input" type="text" id="aiInput" placeholder="Ask anything about attendance..." onkeydown="if(event.key==='Enter') sendAI()"/>
       <button class="ai-send" id="aiSendBtn" onclick="sendAI()">➤</button>
     </div>
   </div>
@@ -581,8 +605,24 @@ async function doRecognize() {
   setTimeout(() => { resetLivenessUI(); isRecognizing = false; }, 1000);
 }
 
-// ─── AI Chat ──────────────────────────────────────────────────────
+// ─── AI Chat (Upgraded) ───────────────────────────────────────────
+let chatHistory = [];
+
 function askAI(q) { document.getElementById('aiInput').value = q; sendAI(); }
+
+function formatMarkdown(text) {
+  let html = text
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/^### (.+)$/gm, '<div style="font-size:0.95rem;font-weight:800;margin:0.5rem 0 0.25rem;color:var(--accent)">$1</div>')
+    .replace(/^## (.+)$/gm, '<div style="font-size:1rem;font-weight:800;margin:0.5rem 0 0.25rem;color:var(--accent)">$1</div>')
+    .replace(/^# (.+)$/gm, '<div style="font-size:1.1rem;font-weight:800;margin:0.5rem 0 0.25rem;color:var(--accent)">$1</div>')
+    .replace(/^• (.+)$/gm, '<div style="padding-left:0.75rem;position:relative"><span style="position:absolute;left:0;color:var(--accent)">•</span> $1</div>')
+    .replace(/^- (.+)$/gm, '<div style="padding-left:0.75rem;position:relative"><span style="position:absolute;left:0;color:var(--accent)">•</span> $1</div>')
+    .replace(/^(\d+)\. (.+)$/gm, '<div style="padding-left:1rem;position:relative"><span style="position:absolute;left:0;color:var(--accent);font-weight:700">$1.</span> $2</div>')
+    .replace(/\n/g, '<br>');
+  return html;
+}
 
 async function sendAI() {
   const input = document.getElementById('aiInput');
@@ -594,8 +634,19 @@ async function sendAI() {
   document.getElementById('aiSendBtn').disabled = true;
   document.getElementById('quickBtns').style.display = 'none';
 
-  chat.innerHTML += `<div class="msg user">${escapeHtml(query)}</div>`;
-  chat.innerHTML += `<div class="msg loading" id="aiLoading"><div class="typing"><span></span><span></span><span></span></div></div>`;
+  // User message
+  const userDiv = document.createElement('div');
+  userDiv.className = 'msg user';
+  userDiv.textContent = query;
+  chat.appendChild(userDiv);
+  chatHistory.push({role: 'user', text: query});
+
+  // Loading indicator
+  const loadDiv = document.createElement('div');
+  loadDiv.className = 'msg loading';
+  loadDiv.id = 'aiLoading';
+  loadDiv.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+  chat.appendChild(loadDiv);
   chat.scrollTop = chat.scrollHeight;
 
   try {
@@ -604,14 +655,33 @@ async function sendAI() {
       body: JSON.stringify({ query })
     });
     const data = await res.json();
-    document.getElementById('aiLoading').remove();
-    chat.innerHTML += `<div class="msg ai">${escapeHtml(data.answer || 'No response.')}</div>`;
+    loadDiv.remove();
+
+    const aiDiv = document.createElement('div');
+    aiDiv.className = 'msg ai';
+    const answer = data.answer || 'No response.';
+    const source = data.source || 'local';
+    aiDiv.innerHTML = formatMarkdown(answer)
+      + `<div class="msg-source ${source === 'ai' ? 'cloud' : 'local'}">${source === 'ai' ? '☁ Claude AI' : '⚡ Local Engine'}</div>`;
+    chat.appendChild(aiDiv);
+    chatHistory.push({role: 'ai', text: answer});
   } catch(e) {
-    document.getElementById('aiLoading').remove();
-    chat.innerHTML += `<div class="msg ai">⚠ Could not reach server.</div>`;
+    loadDiv.remove();
+    const errDiv = document.createElement('div');
+    errDiv.className = 'msg ai';
+    errDiv.innerHTML = '⚠️ Could not reach server. Is the backend running?';
+    chat.appendChild(errDiv);
   }
   chat.scrollTop = chat.scrollHeight;
   document.getElementById('aiSendBtn').disabled = false;
+  input.focus();
+}
+
+function clearChat() {
+  chatHistory = [];
+  const chat = document.getElementById('chatArea');
+  chat.innerHTML = '<div class="msg system">👋 Chat cleared. Ask me anything about attendance!</div>';
+  document.getElementById('quickBtns').style.display = 'flex';
 }
 
 function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }

@@ -498,7 +498,9 @@ def api_delete_user():
         return jsonify({"success": True, "message": f"'{name}' removed."})
     return jsonify({"success": False, "message": "User not found."})
 
-# ─── API: AI Assistant ────────────────────────────────────────────
+# ─── API: AI Assistant (Upgraded) ─────────────────────────────────
+AI_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+
 @app.route("/api/ai_query", methods=["POST"])
 @login_required
 def api_ai_query():
@@ -508,89 +510,262 @@ def api_ai_query():
         return jsonify({"success": False, "message": "No query provided."})
 
     today = datetime.now().strftime("%Y-%m-%d")
+    now_time = datetime.now().strftime("%H:%M:%S")
     conn = get_db()
 
-    # Gather relevant data
+    # ── Gather rich data ──
     today_records = conn.execute(
         "SELECT name, reg_no, roll_no, time, confidence FROM attendance WHERE date=? ORDER BY time", (today,)
     ).fetchall()
-    all_users = conn.execute("SELECT name, reg_no, roll_no FROM users").fetchall()
+    all_users = conn.execute("SELECT name, reg_no, roll_no, email, registered_at FROM users ORDER BY name").fetchall()
     week_records = conn.execute(
-        "SELECT name, date, time FROM attendance WHERE date >= date(?, '-7 days') ORDER BY date DESC", (today,)
+        "SELECT name, date, time FROM attendance WHERE date >= date(?, '-7 days') ORDER BY date DESC, time DESC", (today,)
     ).fetchall()
     month_records = conn.execute(
+        "SELECT name, date, time FROM attendance WHERE date >= date(?, '-30 days') ORDER BY date DESC", (today,)
+    ).fetchall()
+    month_counts = conn.execute(
         "SELECT name, COUNT(*) as count FROM attendance WHERE date >= date(?, '-30 days') GROUP BY name ORDER BY count DESC",
         (today,)
     ).fetchall()
+    total_days = conn.execute("SELECT COUNT(DISTINCT date) FROM attendance").fetchone()[0]
+    total_records = conn.execute("SELECT COUNT(*) FROM attendance").fetchone()[0]
+    # Per-student stats for name lookups
+    all_attendance = conn.execute("SELECT name, date, time FROM attendance ORDER BY date DESC, time DESC").fetchall()
     conn.close()
 
     present_today = [dict(r) for r in today_records]
     all_registered = [dict(r) for r in all_users]
     absent_today = [u for u in all_registered if u["name"] not in [p["name"] for p in present_today]]
     weekly = [dict(r) for r in week_records]
-    monthly_counts = [dict(r) for r in month_records]
+    monthly = [dict(r) for r in month_records]
+    monthly_counts = [dict(r) for r in month_counts]
+    all_att = [dict(r) for r in all_attendance]
 
-    context = f"""
-Today's Date: {today}
-Total Registered Students/Staff: {len(all_registered)}
-Present Today ({len(present_today)}): {json.dumps(present_today, indent=2)}
-Absent Today ({len(absent_today)}): {json.dumps(absent_today, indent=2)}
-Last 7 Days Records: {json.dumps(weekly[:50], indent=2)}
-Monthly Attendance Counts (last 30 days): {json.dumps(monthly_counts, indent=2)}
-"""
+    # ── Try upgraded local answer first ──
+    local = generate_local_answer(query, present_today, absent_today, monthly_counts,
+                                   all_registered, weekly, monthly, all_att, today, now_time, total_days, total_records)
 
-    prompt = f"""You are an intelligent attendance assistant for an AI-powered face recognition system.
-Answer the user's question strictly based on the data provided below.
-If the information is not available in the data, respond with "No record found for this query."
-Be concise, accurate, and helpful. Use bullet points or tables where appropriate.
+    # If local engine gives a confident answer, return it
+    if local and not local.startswith("🤔"):
+        return jsonify({"success": True, "answer": local, "source": "local"})
 
-=== ATTENDANCE DATA ===
+    # ── Try Anthropic API if key is available ──
+    if AI_API_KEY:
+        context = f"""Today: {today} | Time: {now_time}
+Registered: {len(all_registered)} | Present Today: {len(present_today)} | Absent: {len(absent_today)}
+Total Attendance Records: {total_records} | Active Days: {total_days}
+Present Today: {json.dumps(present_today[:30], indent=1)}
+Absent Today: {json.dumps(absent_today[:30], indent=1)}
+Last 7 Days: {json.dumps(weekly[:40], indent=1)}
+Monthly Counts (30d): {json.dumps(monthly_counts[:20], indent=1)}
+All Registered: {json.dumps([{'name':u['name'],'reg_no':u.get('reg_no',''),'roll_no':u.get('roll_no','')} for u in all_registered], indent=1)}"""
+
+        prompt = f"""You are an intelligent attendance assistant for FaceAttend, an AI face recognition attendance system.
+Answer strictly based on the data below. Be concise, use bullet points and emojis. Format nicely.
+If data is unavailable, say so clearly.
+
+=== DATA ===
 {context}
-======================
+============
 
-User Question: {query}"""
+Question: {query}"""
 
-    try:
-        req_data = json.dumps({
-            "model": "claude-sonnet-4-20250514",
-            "max_tokens": 1000,
-            "messages": [{"role": "user", "content": prompt}]
-        }).encode()
+        try:
+            req_data = json.dumps({
+                "model": "claude-sonnet-4-20250514",
+                "max_tokens": 1000,
+                "messages": [{"role": "user", "content": prompt}]
+            }).encode()
+            req = urllib.request.Request(
+                "https://api.anthropic.com/v1/messages",
+                data=req_data,
+                headers={
+                    "Content-Type": "application/json",
+                    "x-api-key": AI_API_KEY,
+                    "anthropic-version": "2023-06-01"
+                }
+            )
+            with urllib.request.urlopen(req, timeout=30) as response:
+                result = json.loads(response.read())
+                answer = result["content"][0]["text"]
+                return jsonify({"success": True, "answer": answer, "source": "ai"})
+        except Exception:
+            pass
 
-        req = urllib.request.Request(
-            "https://api.anthropic.com/v1/messages",
-            data=req_data,
-            headers={
-                "Content-Type": "application/json",
-                "anthropic-version": "2023-06-01"
-            }
-        )
-        with urllib.request.urlopen(req, timeout=30) as response:
-            result = json.loads(response.read())
-            answer = result["content"][0]["text"]
-            return jsonify({"success": True, "answer": answer})
-    except Exception as e:
-        # Fallback: Answer from data directly
-        answer = generate_local_answer(query, present_today, absent_today, monthly_counts, today)
-        return jsonify({"success": True, "answer": answer})
+    # Return local answer (even if uncertain)
+    if local:
+        return jsonify({"success": True, "answer": local, "source": "local"})
+    return jsonify({"success": True, "answer": "I couldn't process that query. Try asking about attendance, absent/present students, or specific names.", "source": "local"})
 
-def generate_local_answer(query, present, absent, monthly, today):
-    q = query.lower()
-    if "absent" in q:
-        if not absent: return "✅ Everyone is present today!"
-        names = ", ".join([a["name"] for a in absent])
-        return f"❌ **Absent today ({len(absent)}):** {names}"
-    elif "present" in q and "today" in q:
-        if not present: return "No attendance recorded yet today."
-        names = "\n".join([f"• {p['name']} ({p['time']})" for p in present])
-        return f"✅ **Present today ({len(present)}):**\n{names}"
-    elif "top" in q or "regular" in q:
-        if not monthly: return "No data available."
-        top = monthly[:5]
-        return "🏆 **Most Regular (last 30 days):**\n" + "\n".join([f"• {r['name']}: {r['count']} days" for r in top])
-    elif "summarize" in q or "summary" in q:
-        return f"📊 **Today's Summary ({today}):**\n• Present: {len(present)}\n• Absent: {len(absent)}"
-    return "I couldn't find specific data for your query. Please ask about today's attendance, absent students, or top attendees."
+
+def generate_local_answer(query, present, absent, monthly_counts, all_users, weekly, monthly, all_att, today, now_time, total_days, total_records):
+    q = query.lower().strip()
+
+    # ── Helper: find user by name ──
+    def find_user(query_text):
+        qt = query_text.lower()
+        for u in all_users:
+            if u["name"].lower() in qt:
+                return u
+        # Partial match
+        for u in all_users:
+            for part in u["name"].lower().split():
+                if len(part) > 2 and part in qt:
+                    return u
+        return None
+
+    # ── Helper: get student attendance records ──
+    def get_student_records(name):
+        return [r for r in all_att if r["name"].lower() == name.lower()]
+
+    # ── 1. Absent today ──
+    if "absent" in q and ("today" in q or "who" in q or q == "absent"):
+        if not absent:
+            return "✅ **Everyone is present today!** All {} registered members have marked attendance.".format(len(all_users))
+        names = "\n".join([f"• {a['name']}" + (f" (Roll: {a.get('roll_no','')})" if a.get('roll_no') else "") for a in absent])
+        return f"❌ **Absent Today ({len(absent)}/{len(all_users)}):**\n{names}"
+
+    # ── 2. Present today ──
+    if ("present" in q or "who came" in q or "who is here" in q or "who arrived" in q) and ("today" in q or "now" in q or q.startswith("who")):
+        if not present:
+            return "📭 No attendance recorded yet today."
+        lines = "\n".join([f"• {p['name']} — arrived at {p['time']}" + (f" ({p['confidence']}% match)" if p.get('confidence') else "") for p in present])
+        return f"✅ **Present Today ({len(present)}/{len(all_users)}):**\n{lines}"
+
+    # ── 3. How many present/absent ──
+    if ("how many" in q or "count" in q or "total" in q):
+        if "present" in q and "today" in q:
+            return f"🔢 **{len(present)}** out of {len(all_users)} members are present today."
+        if "absent" in q:
+            return f"🔢 **{len(absent)}** out of {len(all_users)} members are absent today."
+        if "register" in q or "user" in q or "student" in q:
+            return f"👥 **{len(all_users)}** members are registered in the system."
+        if "record" in q or "total" in q:
+            return f"📊 Total attendance records: **{total_records}** across **{total_days}** days."
+
+    # ── 4. Summary / Overview ──
+    if "summar" in q or "overview" in q or "dashboard" in q or "status" in q or "report" in q and "today" in q:
+        pct = round(len(present) / len(all_users) * 100) if all_users else 0
+        first_arrival = present[0]['time'] if present else "N/A"
+        last_arrival = present[-1]['time'] if present else "N/A"
+        return (f"📊 **Today's Summary — {today}**\n"
+                f"• 👥 Registered: {len(all_users)}\n"
+                f"• ✅ Present: {len(present)} ({pct}%)\n"
+                f"• ❌ Absent: {len(absent)}\n"
+                f"• 🕐 First arrival: {first_arrival}\n"
+                f"• 🕐 Last arrival: {last_arrival}\n"
+                f"• ⏰ Current time: {now_time}")
+
+    # ── 5. Top / Most regular ──
+    if "top" in q or "regular" in q or "best" in q or "most" in q or "rank" in q or "leaderboard" in q:
+        if not monthly_counts:
+            return "📭 No attendance data available for ranking."
+        n = 5
+        for word in q.split():
+            if word.isdigit():
+                n = min(int(word), len(monthly_counts))
+        top = monthly_counts[:n]
+        lines = "\n".join([f"• {i+1}. {r['name']} — **{r['count']}** days" for i, r in enumerate(top)])
+        return f"🏆 **Top {n} Most Regular (Last 30 Days):**\n{lines}"
+
+    # ── 6. Least regular / Irregular ──
+    if "least" in q or "irregular" in q or "worst" in q or "lowest" in q:
+        if not monthly_counts:
+            return "📭 No data available."
+        bottom = list(reversed(monthly_counts))[:5]
+        lines = "\n".join([f"• {r['name']} — **{r['count']}** days" for r in bottom])
+        return f"⚠️ **Least Regular (Last 30 Days):**\n{lines}"
+
+    # ── 7. Specific student lookup ──
+    user = find_user(q)
+    if user:
+        name = user["name"]
+        records = get_student_records(name)
+        today_rec = [r for r in records if r["date"] == today]
+        from datetime import timedelta
+        week_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+        week_rec = [r for r in records if r["date"] >= week_ago]
+        is_present = len(today_rec) > 0
+
+        info = f"👤 **{name}**\n"
+        info += f"• Roll: {user.get('roll_no', 'N/A')} | Reg: {user.get('reg_no', 'N/A')}\n"
+        info += f"• Today: {'✅ Present' if is_present else '❌ Absent'}"
+        if today_rec:
+            info += f" (arrived at {today_rec[0]['time']})"
+        info += f"\n• Total attendance records: **{len(records)}**"
+        if records:
+            info += f"\n• Last seen: {records[0]['date']} at {records[0]['time']}"
+        return info
+
+    # ── 8. Late arrivals ──
+    if "late" in q:
+        late_threshold = "09:30:00"
+        late = [p for p in present if p["time"] > late_threshold]
+        if not late:
+            return f"✅ No late arrivals today (threshold: 9:30 AM)."
+        lines = "\n".join([f"• {p['name']} — arrived at {p['time']}" for p in late])
+        return f"⏰ **Late Arrivals Today ({len(late)})** (after 9:30 AM):\n{lines}"
+
+    # ── 9. Early arrivals ──
+    if "early" in q or "first" in q:
+        if not present:
+            return "📭 No attendance recorded yet today."
+        early = present[:5]
+        lines = "\n".join([f"• {p['name']} — {p['time']}" for p in early])
+        return f"🌅 **Earliest Arrivals Today:**\n{lines}"
+
+    # ── 10. Percentage / Rate ──
+    if "percent" in q or "rate" in q or "ratio" in q or "%" in q:
+        if not all_users:
+            return "📭 No registered users."
+        pct = round(len(present) / len(all_users) * 100, 1)
+        return f"📈 **Today's Attendance Rate:** {pct}% ({len(present)}/{len(all_users)})"
+
+    # ── 11. This week ──
+    if "week" in q or "last 7" in q or "past 7" in q:
+        if not weekly:
+            return "📭 No records in the last 7 days."
+        days = sorted(set(w["date"] for w in weekly), reverse=True)
+        lines = []
+        for d in days[:7]:
+            day_recs = [w for w in weekly if w["date"] == d]
+            names = ", ".join(set(w["name"] for w in day_recs))
+            lines.append(f"• **{d}**: {len(day_recs)} present — {names}")
+        return f"📅 **Last 7 Days Attendance:**\n" + "\n".join(lines)
+
+    # ── 12. Help / What can you do ──
+    if "help" in q or "what can" in q or "how to" in q or "commands" in q:
+        return ("🤖 **I can help with:**\n"
+                "• Who is absent/present today?\n"
+                "• How many students are present?\n"
+                "• Summarize today's attendance\n"
+                "• Top 5 most regular students\n"
+                "• Show least regular students\n"
+                "• Who came late today?\n"
+                "• Who arrived first today?\n"
+                "• Attendance percentage today\n"
+                "• This week's attendance\n"
+                "• Search by student name\n"
+                "• How many are registered?\n"
+                "💡 Just type your question naturally!")
+
+    # ── 13. Greetings ──
+    if q in ["hi", "hello", "hey", "yo", "sup", "hola"]:
+        return f"👋 Hello! I'm your attendance assistant. Today is **{today}** — {len(present)} present, {len(absent)} absent out of {len(all_users)} registered. How can I help?"
+
+    # ── 14. Thanks ──
+    if "thank" in q or "thanks" in q:
+        return "😊 You're welcome! Let me know if you need anything else."
+
+    # ── Fallback ──
+    return ("🤔 I'm not sure how to answer that. Here are some things I can help with:\n"
+            "• **\"Who is absent today?\"**\n"
+            "• **\"Summarize attendance\"**\n"
+            "• **\"Top 5 regular students\"**\n"
+            "• **\"Who came late?\"**\n"
+            "• **Search by name** — just mention a student's name\n"
+            "• Type **\"help\"** for all options")
 
 # ─── API: Email Config Update ─────────────────────────────────────
 @app.route("/api/email_config", methods=["POST"])
