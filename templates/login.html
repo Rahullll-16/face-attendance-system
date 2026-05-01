@@ -229,7 +229,7 @@
 </style>
 </head>
 <body>
-
+  
 <div class="bg-anim" id="bgAnim"></div>
 <div class="grid-bg"></div>
 <div class="orb orb1" id="orb1"></div>
@@ -331,89 +331,159 @@ let faceStream = null;
 function switchRole(role) {
   currentRole = role;
   const isStudent = role === 'student';
+  const card = document.getElementById('mainCard');
+  const bgAnim = document.getElementById('bgAnim');
+
+  document.getElementById('tabAdmin').className = isStudent ? 'role-tab' : 'role-tab active-admin';
+  document.getElementById('tabStudent').className = isStudent ? 'role-tab active-student' : 'role-tab';
 
   document.getElementById('adminPanel').classList.toggle('hidden', isStudent);
   document.getElementById('studentPanel').classList.toggle('hidden', !isStudent);
+
+  card.classList.toggle('student-active', isStudent);
+  bgAnim.classList.toggle('student-mode', isStudent);
+
+  if (isStudent) {
+    document.getElementById('roleIcon').textContent = '🎓';
+    document.getElementById('roleBanner').textContent = 'Student — View your attendance record';
+  } else {
+    document.getElementById('roleIcon').textContent = '🔐';
+    document.getElementById('roleBanner').textContent = 'Admin — Full system access';
+  }
+
+  document.getElementById('adminError').style.display = 'none';
+  document.getElementById('studentError').style.display = 'none';
 }
 
-// ✅ ADMIN LOGIN
+// ✅ ADMIN LOGIN (ALREADY CORRECT)
 async function doAdminLogin() {
-  const res = await fetch('/login', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({
-      username: document.getElementById('adminUsername').value,
-      password: document.getElementById('adminPassword').value
-    })
-  });
+  const btn = document.getElementById('adminLoginBtn');
+  const err = document.getElementById('adminError');
 
-  const data = await res.json();
+  btn.disabled = true;
+  btn.textContent = 'Signing in...';
+  err.style.display = 'none';
 
-  if (data.success) {
-    window.location.href = "/";
-  } else {
-    alert("Invalid credentials");
+  try {
+    const res = await fetch('/login', {   // ✅ CORRECT ENDPOINT
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: document.getElementById('adminUsername').value,
+        password: document.getElementById('adminPassword').value
+      })
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      btn.textContent = '✅ Access Granted!';
+      setTimeout(() => window.location.href = '/', 400);
+    } else {
+      err.textContent = data.message || 'Invalid credentials.';
+      err.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Sign In →';
+    }
+  } catch (e) {
+    err.textContent = 'Server error. Is backend running?';
+    err.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Sign In →';
   }
 }
 
-// ✅ STUDENT LOGIN
+// ✅ FIXED STUDENT LOGIN (MAIN CHANGE)
 async function doStudentLogin() {
   const roll = document.getElementById('studentRoll').value.trim();
   const name = document.getElementById('studentName').value.trim();
   const reg = document.getElementById('studentReg').value.trim();
+  const err = document.getElementById('studentError');
+  const btn = document.getElementById('studentLoginBtn');
 
-  if (!roll || !name) {
-    alert("Roll No and Name required");
+  err.style.display = 'none';
+
+  if (!roll || !name || !reg) {
+    err.textContent = 'Please fill all fields.';
+    err.style.display = 'block';
     return;
   }
 
-  const res = await fetch('/student_login', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({
-      roll_no: roll,
-      name: name,
-      reg_no: reg
-    })
-  });
+  btn.disabled = true;
+  btn.textContent = 'Checking...';
 
-  const data = await res.json();
+  try {
+    const res = await fetch('/student_login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        roll_no: roll,
+        name: name,
+        reg_no: reg
+      })
+    });
 
-  if (data.success) {
-    window.location.href = "/report";
-  } else {
-    alert("Invalid student details");
+    const data = await res.json();
+
+    if (data.success) {
+      btn.textContent = '✅ Login Success';
+      setTimeout(() => {
+        window.location.href = "/report";   // ✅ FIXED REDIRECT
+      }, 400);
+    } else {
+      err.textContent = data.message || 'Invalid student details';
+      err.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'View My Attendance →';
+    }
+  } catch (e) {
+    err.textContent = 'Server error';
+    err.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'View My Attendance →';
   }
 }
 
-// ✅ FACE LOGIN MODAL
 function openFaceModal() {
   document.getElementById('faceModal').classList.add('show');
 }
 
 function closeFaceModal() {
   document.getElementById('faceModal').classList.remove('show');
+  stopCamera();
+}
 
+async function startModalCamera() {
+  const video = document.getElementById("modalVideo");
+  const placeholder = document.getElementById("modalCamPh");
+  const status = document.getElementById("modalStatus");
+
+  try {
+    faceStream = await navigator.mediaDevices.getUserMedia({ video: true });
+
+    video.srcObject = faceStream;
+    video.style.display = "block";
+    placeholder.style.display = "none";
+
+    document.getElementById("modalIdentifyBtn").disabled = false;
+    status.textContent = "Camera ready. Click Identify.";
+
+  } catch (err) {
+    status.textContent = "Camera permission denied ❌";
+  }
+}
+
+function stopCamera() {
   if (faceStream) {
     faceStream.getTracks().forEach(track => track.stop());
   }
 }
 
-// ✅ START CAMERA
-async function startModalCamera() {
-  const video = document.getElementById("modalVideo");
-
-  try {
-    faceStream = await navigator.mediaDevices.getUserMedia({ video: true });
-    video.srcObject = faceStream;
-  } catch (err) {
-    alert("Camera permission denied");
-  }
-}
-
-// ✅ FACE IDENTIFY
 async function identifyFace() {
   const video = document.getElementById("modalVideo");
+  const status = document.getElementById("modalStatus");
+
+  status.textContent = "Capturing...";
 
   const canvas = document.createElement("canvas");
   canvas.width = video.videoWidth;
@@ -424,22 +494,23 @@ async function identifyFace() {
 
   const image = canvas.toDataURL("image/jpeg");
 
-  if (faceStream) {
-    faceStream.getTracks().forEach(track => track.stop());
-  }
+  stopCamera();
 
   const res = await fetch("/api/face_login", {
     method: "POST",
-    headers: {"Content-Type": "application/json"},
+    headers: {
+      "Content-Type": "application/json"
+    },
     body: JSON.stringify({ image })
   });
 
   const data = await res.json();
 
   if (data.success) {
+    alert("Welcome " + data.name);
     window.location.href = "/report";
   } else {
-    alert(data.message || "Face not recognized");
+    status.textContent = "Face not recognized ❌";
   }
 }
 </script>
