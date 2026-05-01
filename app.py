@@ -143,16 +143,16 @@ def login():
         data = request.json
         username = data.get("username", "")
         password = data.get("password", "")
+
         pw_hash = hashlib.sha256(password.encode()).hexdigest()
+
         if username == ADMIN_USERNAME and pw_hash == ADMIN_PASSWORD_HASH:
+            session.clear()
             session['admin_logged_in'] = True
+            return jsonify({"success": True})
 
-    # 🔥 IMPORTANT: student session clear
-            session.pop('student_roll', None)
-            session.pop('student_name', None)
-
-        return jsonify({"success": True})
         return jsonify({"success": False, "message": "Invalid credentials"})
+
     return render_template("login.html")
 
 
@@ -169,30 +169,64 @@ def student_login():
 
     conn = get_db()
     user = conn.execute(
-        "SELECT * FROM users WHERE TRIM(LOWER(name)) = TRIM(LOWER(?))AND TRIM(roll_no) = TRIM(?)AND TRIM(reg_no) = TRIM(?)",
+        "SELECT * FROM users WHERE LOWER(name)=LOWER(?) AND roll_no=? AND reg_no=?",
         (name, roll_no, reg_no)
     ).fetchone()
     conn.close()
 
     if user:
-        session['student_name'] = user['name']
-        session['student_roll'] = user['roll_no']
+        session.clear()
+        session['student'] = dict(user)   # 🔥 FIXED
 
-        return jsonify({
-            "success": True,
-            "message": "Login successful",
-            "user": dict(user)
-        })
-    else:
-        return jsonify({
-        "success": False,
-        "message": "Invalid student details"
-    })
-@app.route("/logout")
-def logout():
-    session.clear()
-    return redirect(url_for('login'))
+        return jsonify({"success": True})
 
+    return jsonify({"success": False, "message": "Invalid student details"})
+
+# ─── Student login with face ─────────────────────────────────────
+@app.route("/api/face_login", methods=["POST"])
+def face_login():
+    import face_recognition, numpy as np, base64, cv2, pickle
+
+    data = request.json
+    image_data = data.get("image")
+
+    if not image_data:
+        return jsonify({"success": False})
+
+    img_bytes = base64.b64decode(image_data.split(',')[1])
+    nparr = np.frombuffer(img_bytes, np.uint8)
+    frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+    face_locations = face_recognition.face_locations(frame)
+    if not face_locations:
+        return jsonify({"success": False, "message": "No face found"})
+
+    encodings = face_recognition.face_encodings(frame, face_locations)
+
+    with open("face_data/encodings.pkl", "rb") as f:
+        known = pickle.load(f)
+
+    for encoding in encodings:
+        matches = face_recognition.compare_faces(known["encodings"], encoding)
+
+        if True in matches:
+            index = matches.index(True)
+            name = known["names"][index]
+
+            conn = get_db()
+            user = conn.execute(
+                "SELECT * FROM users WHERE LOWER(name)=LOWER(?)",
+                (name,)
+            ).fetchone()
+            conn.close()
+
+            if user:
+                session.clear()
+                session['student'] = dict(user)   # 🔥 MAIN FIX
+
+                return jsonify({"success": True})
+
+    return jsonify({"success": False, "message": "Face not recognized"})
 # ─── API: Register Face ───────────────────────────────────────────
 @app.route("/api/register", methods=["POST"])
 @login_required
@@ -361,47 +395,44 @@ def api_attendance():
     date_filter = request.args.get("date", "")
     conn = get_db()
 
-    is_admin = session.get('admin_logged_in')
-    student_roll = session.get('student_roll')
+    student = session.get("student")
+    is_admin = session.get("admin_logged_in")
 
     if is_admin:
-        # 👉 ADMIN → full data
         if date_filter:
             rows = conn.execute("""
-                SELECT name, reg_no, roll_no, date, time, status, confidence
-                FROM attendance
-                WHERE date=?
+                SELECT * FROM attendance WHERE date=?
                 ORDER BY time DESC
             """, (date_filter,)).fetchall()
         else:
             rows = conn.execute("""
-                SELECT name, reg_no, roll_no, date, time, status, confidence
-                FROM attendance
+                SELECT * FROM attendance
                 ORDER BY date DESC, time DESC
             """).fetchall()
 
-    elif student_roll:
-        # 👉 STUDENT → only his data
+    elif student:
         if date_filter:
             rows = conn.execute("""
-                SELECT name, reg_no, roll_no, date, time, status, confidence
-                FROM attendance
-                WHERE roll_no=? AND date=?
+                SELECT * FROM attendance 
+                WHERE LOWER(name)=LOWER(?) AND date=?
                 ORDER BY time DESC
-            """, (student_roll, date_filter)).fetchall()
+            """, (student["name"], date_filter)).fetchall()
         else:
             rows = conn.execute("""
-                SELECT name, reg_no, roll_no, date, time, status, confidence
-                FROM attendance
-                WHERE roll_no=?
+                SELECT * FROM attendance 
+                WHERE LOWER(name)=LOWER(?)
                 ORDER BY date DESC, time DESC
-            """, (student_roll,)).fetchall()
+            """, (student["name"],)).fetchall()
 
     else:
         rows = []
 
     conn.close()
-    return jsonify({"success": True, "records": [dict(r) for r in rows]})
+
+    return jsonify({
+        "success": True,
+        "records": [dict(r) for r in rows]
+    })
 # ─── API: Get Registered Users ────────────────────────────────────
 @app.route("/api/users", methods=["GET"])
 @login_required
