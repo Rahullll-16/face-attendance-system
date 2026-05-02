@@ -133,6 +133,10 @@ def index():
 def register():
     return render_template("register.html")
 
+@app.route("/self_register")
+def self_register():
+    return render_template("self_register.html")
+
 @app.route("/report")
 def report():
     return render_template("report.html")
@@ -310,6 +314,68 @@ def api_register():
     finally: conn.close()
 
     return jsonify({"success": True, "message": f"✅ '{name}' registered successfully!"})
+
+# ─── API: Self-Register (No login required) ───────────────────────
+@app.route("/api/self_register", methods=["POST"])
+def api_self_register():
+    """Allow students to register themselves without admin login"""
+    data = request.json
+    name = data.get("name", "").strip()
+    reg_no = data.get("reg_no", "").strip()
+    roll_no = data.get("roll_no", "").strip()
+    email = data.get("email", "").strip()
+    image_data = data.get("image", "")
+
+    if not name or not image_data:
+        return jsonify({"success": False, "message": "Name and face photo are required."})
+    if not roll_no:
+        return jsonify({"success": False, "message": "Roll number is required."})
+    if not reg_no:
+        return jsonify({"success": False, "message": "Registration number is required."})
+
+    try:
+        header, encoded = image_data.split(",", 1)
+        img_bytes = base64.b64decode(encoded)
+        np_arr = np.frombuffer(img_bytes, np.uint8)
+        img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+        rgb_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Image decode error: {str(e)}"})
+
+    encodings = face_recognition.face_encodings(rgb_img)
+    if len(encodings) == 0:
+        return jsonify({"success": False, "message": "No face detected. Please try again with a clearer photo."})
+    if len(encodings) > 1:
+        return jsonify({"success": False, "message": "Multiple faces detected. Please ensure only one face is visible."})
+
+    face_data = load_face_data()
+
+    if name in face_data["names"]:
+        return jsonify({"success": False, "message": f"'{name}' is already registered. Please login instead."})
+
+    # Check if roll_no or reg_no already exists in users table
+    conn = get_db()
+    existing = conn.execute("SELECT name FROM users WHERE roll_no=? OR reg_no=?", (roll_no, reg_no)).fetchone()
+    if existing:
+        conn.close()
+        return jsonify({"success": False, "message": f"Roll No or Reg No already registered under '{existing['name']}'. Contact admin if this is an error."})
+
+    face_data["names"].append(name)
+    face_data["encodings"].append(encodings[0])
+    if "reg_nos" not in face_data: face_data["reg_nos"] = []
+    if "roll_nos" not in face_data: face_data["roll_nos"] = []
+    face_data["reg_nos"].append(reg_no)
+    face_data["roll_nos"].append(roll_no)
+    save_face_data(face_data)
+
+    try:
+        conn.execute("INSERT OR IGNORE INTO users (name, reg_no, roll_no, email, registered_at) VALUES (?,?,?,?,?)",
+                     (name, reg_no, roll_no, email, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+        conn.commit()
+    except: pass
+    finally: conn.close()
+
+    return jsonify({"success": True, "message": f"✅ '{name}' registered successfully! You can now login."})
 
 # ─── API: Liveness Check ──────────────────────────────────────────
 @app.route("/api/liveness_check", methods=["POST"])

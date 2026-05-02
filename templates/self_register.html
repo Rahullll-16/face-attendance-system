@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Student Registration – FaceAttend</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #060608; --surface: #0f0f14; --surface2: #18181f; --border: #252530;
+    --accent: #00e5a0; --accent2: #7c3aed; --text: #e8e8f0; --muted: #5a5a6e;
+    --danger: #ef4444;
+    --font: 'Syne', sans-serif; --mono: 'DM Mono', monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--text); font-family: var(--font);
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    overflow-x: hidden;
+  }
+  .bg-anim {
+    position: fixed; inset: 0; z-index: 0;
+    background: radial-gradient(ellipse at 30% 40%, rgba(124,58,237,0.07) 0%, transparent 60%),
+                radial-gradient(ellipse at 70% 60%, rgba(0,229,160,0.05) 0%, transparent 60%);
+  }
+  .grid-bg {
+    position: fixed; inset: 0; z-index: 0;
+    background-image: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 50px 50px;
+  }
+  .orb { position: fixed; border-radius: 50%; filter: blur(80px); z-index: 0; pointer-events: none; animation: float 8s ease-in-out infinite; }
+  .orb1 { width: 350px; height: 350px; background: rgba(124,58,237,0.08); top: -80px; left: -80px; }
+  .orb2 { width: 280px; height: 280px; background: rgba(0,229,160,0.06); bottom: -50px; right: -50px; animation-delay: -4s; }
+  @keyframes float { 0%,100%{transform:translate(0,0)} 50%{transform:translate(20px,-20px)} }
+
+  .card {
+    position: relative; z-index: 1; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 24px; padding: 2.5rem;
+    width: 100%; max-width: 480px; box-shadow: 0 40px 80px rgba(0,0,0,0.5);
+    animation: appear 0.5s cubic-bezier(0.34,1.2,0.64,1);
+    margin: 2rem;
+  }
+  @keyframes appear { from{opacity:0;transform:translateY(30px) scale(.96)} to{opacity:1;transform:translateY(0) scale(1)} }
+
+  .back-link {
+    display: inline-flex; align-items: center; gap: 0.4rem; color: var(--muted);
+    text-decoration: none; font-family: var(--mono); font-size: 0.75rem;
+    margin-bottom: 1.5rem; transition: color 0.2s; text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .back-link:hover { color: var(--accent); }
+
+  .logo { margin-bottom: 1.5rem; }
+  .logo-text { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.04em; }
+  .logo-text span { color: var(--accent); }
+  .logo-sub { font-family: var(--mono); font-size: 0.7rem; color: var(--muted); margin-top: 0.2rem; text-transform: uppercase; letter-spacing: 0.1em; }
+
+  .role-banner {
+    padding: 0.5rem 0.85rem; border-radius: 9px; margin-bottom: 1.25rem;
+    font-family: var(--mono); font-size: 0.7rem; text-transform: uppercase;
+    letter-spacing: 0.08em; font-weight: 500;
+    background: rgba(124,58,237,0.1); border: 1px solid rgba(124,58,237,0.25); color: #a78bfa;
+  }
+  h2 { font-size: 1.35rem; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 0.4rem; }
+  .desc { font-family: var(--mono); font-size: 0.78rem; color: var(--muted); margin-bottom: 1.5rem; }
+
+  .form-group { margin-bottom: 1rem; }
+  .form-label { display: block; font-family: var(--mono); font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.4rem; }
+  .required { color: var(--danger); margin-left: 2px; }
+  .form-input {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); padding: 0.8rem 0.9rem; border-radius: 10px;
+    font-family: var(--font); font-size: 0.95rem; font-weight: 600; outline: none; transition: all 0.2s;
+  }
+  .form-input:focus { border-color: var(--accent2); box-shadow: 0 0 0 3px rgba(124,58,237,0.12); }
+  .form-input::placeholder { color: var(--muted); font-weight: 400; font-size: 0.85rem; }
+  .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+
+  /* Camera */
+  .cam-section { margin-bottom: 1rem; }
+  .cam-wrap {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 12px;
+    overflow: hidden; aspect-ratio: 4/3; position: relative; margin-bottom: 0.6rem;
+  }
+  .cam-wrap video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .cam-ph { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--muted); font-family: var(--mono); font-size: 0.8rem; gap: 0.6rem; }
+  .cam-ph .icon { font-size: 2.5rem; opacity: 0.2; }
+  .cam-controls { display: flex; gap: 0.5rem; }
+  .btn-cam {
+    flex: 1; padding: 0.7rem; border-radius: 10px; border: none; font-family: var(--font);
+    font-size: 0.8rem; font-weight: 700; cursor: pointer; transition: all 0.2s;
+    text-transform: uppercase; letter-spacing: 0.02em;
+  }
+  .btn-cam-start { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-cam-start:hover { background: var(--border); }
+  .btn-cam-capture { background: var(--accent2); color: white; }
+  .btn-cam-capture:hover { background: #8b5cf6; }
+  .btn-cam:disabled { opacity: 0.35; cursor: not-allowed; }
+  .flash { position: absolute; inset: 0; background: white; pointer-events: none; opacity: 0; transition: opacity 0.05s; border-radius: 12px; }
+  .flash.go { opacity: 0.6; }
+
+  /* Captured preview */
+  .captured-preview { position: relative; margin-bottom: 1rem; display: none; }
+  .captured-preview img { width: 100%; border-radius: 10px; border: 2px solid rgba(124,58,237,0.4); }
+  .preview-badge {
+    position: absolute; top: 8px; right: 8px; background: rgba(0,229,160,0.9); color: #000;
+    font-family: var(--mono); font-size: 0.65rem; font-weight: 700; padding: 0.2rem 0.6rem;
+    border-radius: 6px; text-transform: uppercase;
+  }
+  .btn-retake {
+    position: absolute; bottom: 8px; right: 8px; background: rgba(239,68,68,0.85); color: white;
+    border: none; padding: 0.35rem 0.7rem; border-radius: 6px; font-family: var(--font);
+    font-size: 0.72rem; font-weight: 700; cursor: pointer; text-transform: uppercase;
+  }
+  .btn-retake:hover { background: rgba(239,68,68,1); }
+
+  .btn-register {
+    width: 100%; padding: 0.95rem; background: var(--accent2); color: white;
+    border: none; border-radius: 12px; font-family: var(--font);
+    font-size: 0.95rem; font-weight: 800; cursor: pointer; transition: all 0.3s;
+    letter-spacing: 0.02em; text-transform: uppercase; margin-top: 0.5rem;
+  }
+  .btn-register:hover { background: #8b5cf6; transform: translateY(-1px); box-shadow: 0 8px 20px rgba(124,58,237,0.25); }
+  .btn-register:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  .status-msg {
+    padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.85rem; margin-top: 1rem;
+    display: none; text-align: center; font-weight: 600;
+  }
+  .status-msg.success { background: rgba(0,229,160,0.1); border: 1px solid rgba(0,229,160,0.3); color: var(--accent); display: block; }
+  .status-msg.error { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: var(--danger); display: block; }
+
+  .info-note {
+    margin-top: 1.25rem; padding: 0.85rem; background: rgba(124,58,237,0.07);
+    border: 1px solid rgba(124,58,237,0.2); border-radius: 10px;
+    font-family: var(--mono); font-size: 0.7rem; color: var(--muted); line-height: 1.6;
+  }
+  .info-note strong { color: #a78bfa; }
+
+  .login-link {
+    display: block; text-align: center; margin-top: 1.25rem; color: var(--muted);
+    font-family: var(--mono); font-size: 0.75rem; text-decoration: none; transition: color 0.2s;
+  }
+  .login-link:hover { color: var(--accent); }
+  .login-link span { color: var(--accent); font-weight: 600; }
+
+  canvas { display: none; }
+</style>
+</head>
+<body>
+
+<div class="bg-anim"></div>
+<div class="grid-bg"></div>
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+
+<div class="card">
+  <a href="/login" class="back-link">← Back to Login</a>
+
+  <div class="logo">
+    <div class="logo-text">Face<span>Attend</span></div>
+    <div class="logo-sub">// Student Self-Registration</div>
+  </div>
+
+  <div class="role-banner">🎓 New Student Registration</div>
+  <h2>Register Yourself</h2>
+  <p class="desc">Create your account with face recognition</p>
+
+  <!-- Form Fields -->
+  <div class="form-group">
+    <label class="form-label">Full Name <span class="required">*</span></label>
+    <input class="form-input" type="text" id="fName" placeholder="e.g. Arjun Sharma" autocomplete="off"/>
+  </div>
+  <div class="input-row">
+    <div class="form-group">
+      <label class="form-label">Roll No <span class="required">*</span></label>
+      <input class="form-input" type="text" id="fRoll" placeholder="e.g. 2301" autocomplete="off"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Reg No <span class="required">*</span></label>
+      <input class="form-input" type="text" id="fReg" placeholder="e.g. PU2024001" autocomplete="off"/>
+    </div>
+  </div>
+  <div class="form-group">
+    <label class="form-label">Email Address</label>
+    <input class="form-input" type="email" id="fEmail" placeholder="student@university.edu"/>
+  </div>
+
+  <!-- Camera Section -->
+  <div class="cam-section">
+    <label class="form-label">Face Photo <span class="required">*</span></label>
+    <div class="cam-wrap" id="camWrap">
+      <div class="cam-ph" id="camPh">
+        <div class="icon">📷</div>
+        <p>Start camera to capture your face</p>
+      </div>
+      <video id="videoFeed" autoplay playsinline style="display:none;"></video>
+      <div class="flash" id="flashEl"></div>
+    </div>
+    <div class="cam-controls">
+      <button class="btn-cam btn-cam-start" id="startBtn" onclick="startCamera()">▶ Start Camera</button>
+      <button class="btn-cam btn-cam-capture" id="captureBtn" onclick="capturePhoto()" disabled>📸 Capture</button>
+    </div>
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <!-- Captured Preview -->
+  <div class="captured-preview" id="previewWrap">
+    <img id="previewImg" alt="Captured face"/>
+    <span class="preview-badge">✓ Captured</span>
+    <button class="btn-retake" onclick="retakePhoto()">↻ Retake</button>
+  </div>
+
+  <div id="statusMsg" class="status-msg"></div>
+
+  <button class="btn-register" id="regBtn" onclick="doRegister()" disabled>
+    📸 Capture a photo first
+  </button>
+
+  <div class="info-note">
+    <strong>How it works:</strong> Fill in your details, capture a clear face photo, and hit Register.
+    Once registered, you can login using your credentials or face recognition.
+  </div>
+
+  <a href="/login" class="login-link">Already registered? <span>Login here →</span></a>
+</div>
+
+<script>
+let stream = null;
+let capturedImage = null;
+
+async function startCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720, facingMode: 'user' } });
+    const v = document.getElementById('videoFeed');
+    v.srcObject = stream; v.style.display = 'block';
+    document.getElementById('camPh').style.display = 'none';
+    document.getElementById('startBtn').textContent = '■ Stop';
+    document.getElementById('startBtn').onclick = stopCamera;
+    document.getElementById('captureBtn').disabled = false;
+  } catch(e) {
+    alert('Camera access denied. Please allow camera permission.');
+  }
+}
+
+function stopCamera() {
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  document.getElementById('videoFeed').style.display = 'none';
+  document.getElementById('camPh').style.display = 'flex';
+  document.getElementById('startBtn').textContent = '▶ Start Camera';
+  document.getElementById('startBtn').onclick = startCamera;
+  document.getElementById('captureBtn').disabled = true;
+}
+
+function capturePhoto() {
+  const v = document.getElementById('videoFeed');
+  const c = document.getElementById('canvas');
+  c.width = v.videoWidth; c.height = v.videoHeight;
+  c.getContext('2d').drawImage(v, 0, 0);
+  capturedImage = c.toDataURL('image/jpeg', 0.95);
+
+  // Flash
+  const f = document.getElementById('flashEl');
+  f.classList.add('go'); setTimeout(() => f.classList.remove('go'), 120);
+
+  // Show preview
+  document.getElementById('previewImg').src = capturedImage;
+  document.getElementById('previewWrap').style.display = 'block';
+
+  // Enable register
+  document.getElementById('regBtn').disabled = false;
+  document.getElementById('regBtn').textContent = '✅ Register Now';
+
+  stopCamera();
+  document.getElementById('camWrap').style.display = 'none';
+  document.getElementById('startBtn').style.display = 'none';
+  document.getElementById('captureBtn').style.display = 'none';
+}
+
+function retakePhoto() {
+  capturedImage = null;
+  document.getElementById('previewWrap').style.display = 'none';
+  document.getElementById('camWrap').style.display = 'block';
+  document.getElementById('startBtn').style.display = 'block';
+  document.getElementById('captureBtn').style.display = 'block';
+  document.getElementById('regBtn').disabled = true;
+  document.getElementById('regBtn').textContent = '📸 Capture a photo first';
+  startCamera();
+}
+
+async function doRegister() {
+  const name = document.getElementById('fName').value.trim();
+  const roll = document.getElementById('fRoll').value.trim();
+  const reg = document.getElementById('fReg').value.trim();
+  const email = document.getElementById('fEmail').value.trim();
+  const msg = document.getElementById('statusMsg');
+  const btn = document.getElementById('regBtn');
+
+  if (!name) { showError('Please enter your full name.'); return; }
+  if (!roll) { showError('Please enter your roll number.'); return; }
+  if (!reg) { showError('Please enter your registration number.'); return; }
+  if (!capturedImage) { showError('Please capture a face photo.'); return; }
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Registering...';
+  msg.style.display = 'none';
+
+  try {
+    const res = await fetch('/api/self_register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, roll_no: roll, reg_no: reg, email, image: capturedImage })
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      msg.className = 'status-msg success';
+      msg.textContent = data.message;
+      btn.textContent = '✅ Registered! Redirecting...';
+      setTimeout(() => { window.location.href = '/login'; }, 2000);
+    } else {
+      msg.className = 'status-msg error';
+      msg.textContent = data.message;
+      btn.disabled = false;
+      btn.textContent = '✅ Register Now';
+    }
+  } catch(e) {
+    showError('Server error. Is backend running?');
+    btn.disabled = false;
+    btn.textContent = '✅ Register Now';
+  }
+}
+
+function showError(text) {
+  const msg = document.getElementById('statusMsg');
+  msg.className = 'status-msg error';
+  msg.textContent = text;
+}
+</script>
+</body>
+</html>

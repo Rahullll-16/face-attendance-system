@@ -267,11 +267,10 @@
     </div>
     <button class="btn-login" id="adminLoginBtn" onclick="doAdminLogin()">Sign In →</button>
     <div class="error-msg" id="adminError"></div>
-    <div class="default-hint">
-      <strong>Default credentials:</strong><br>
-      Username: <strong>admin</strong> &nbsp;|&nbsp; Password: <strong>admin123</strong><br>
-      Change these in <code>app.py</code> before deploying.
-    </div>
+    
+    <a href="/self_register" style="display:block;text-align:center;margin-top:1.25rem;color:var(--muted);font-family:var(--mono);font-size:0.78rem;text-decoration:none;transition:color 0.2s;">
+      Are you a student? <span style="color:var(--accent);font-weight:600;">Register yourself →</span>
+    </a>
   </div>
 
   <!-- ── STUDENT PANEL ── -->
@@ -300,7 +299,15 @@
     <div class="student-note">
       <strong>Students:</strong> Enter your Roll No and Name to view your personal attendance record. Face login will identify you automatically.
     </div>
+    <a href="/self_register" style="display:block;text-align:center;margin-top:1.25rem;color:var(--muted);font-family:var(--mono);font-size:0.78rem;text-decoration:none;transition:color 0.2s;">
+      New student? <span style="color:#a78bfa;font-weight:600;">Register yourself here →</span>
+    </a>
   </div>
+
+  <!-- Register link visible on admin panel too -->
+  <a href="/self_register" id="selfRegLink" style="display:none;text-align:center;margin-top:1.25rem;color:var(--muted);font-family:var(--mono);font-size:0.78rem;text-decoration:none;transition:color 0.2s;">
+    Are you a student? <span style="color:#a78bfa;font-weight:600;">Register yourself →</span>
+  </a>
 </div>
 
 <!-- Face Capture Modal -->
